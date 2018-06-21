@@ -4,7 +4,7 @@ library(dplyr)
 library(magrittr)
 library(lubridate)
 
-work_dir <- "C://Data//Smartrack//"
+work_dir <- "C://Data//SmartrackR//"
 setwd(paste0(work_dir, ".//Data//"))
 
 
@@ -15,7 +15,7 @@ buses <- data.frame()
 for(i in 1:length(tfv_file))
 {
   buses <- rbind(buses,
-                     read.csv(tfv_file[i], header = TRUE,stringsAsFactors = F))
+                     read.csv(tfv_file[i], header = TRUE,stringsAsFactors = F, skip=1))
 }
 
 setwd(work_dir)
@@ -24,11 +24,15 @@ setwd(work_dir)
 
 buses <- buses %>% filter(Geofence.Name != "")
 
+#Enter.Time is in a different format when dowloading directly compared to converting from xlsx
+# for csv direct download use as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), format = '%d/%m/%Y %H:%M'))
+# for converted csv use as.POSIXct(Enter.Time), format = '%d/%m/%Y %I:%M:%S %p'
 # format arrival time and separate geofence name into columns, then order by bus and timestamp
-buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), format = '%d/%m/%Y %H:%M')) ,
+buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), format = '%d/%m/%Y %I:%M:%S %p')),
                          project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                          stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                          destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
+                         filter(hour(arrival) > 17) %>%
   arrange(Resource.Name, seconds(Enter.Time))
 
 #format dwell time into seconds
@@ -48,9 +52,15 @@ buses$origin[1] <- "0"
 # Caulfield - Carnegie - LTD EXP Flag - Full Exp Flag - Westall
 # Malvern - Carnegie - LTD EXP Flag - Oakleigh - Huntingdale - Clayton - Westall
 # Caulfield - Carnegie - Murrumbeena - Hughesdale - Oakleigh - Huntingdale - Clayton - Westall
-express <- c("Caulfield","Carnegie","LTD EXP Flag","Full Exp Flag","Westall")
-ltd_express <- c("Malvern","Carnegie","LTD EXP Flag","Oakleigh","Huntingdale","Clayton","Westall")
-sas <- c("Caulfield","Carnegie","Murrumbeena","Hughesdale","Oakleigh","Huntingdale","Clayton","Westall")
+
+#NEW VALID TRIPS:
+#Stopping all Stations (SAS): Newmarket - Ascot Vale - Moonee Ponds - Essendon
+#Limited Express (LTD EXP): Flemington Racecourse - Essendon - Glenbervie - Strathmore - Pascoe Vale - Oak Park - Glenroy - Broadmeadows
+#Express (EXP): Flemington Racecourse - EXP Flag - Broadmeadows
+
+express <- c("Flemington","Full Exp Flag","Broadmeadows") #-2
+ltd_express <- c("Flemington","Essendon","Glenbervie","Strathmore","Pascoe Vale","Oak Park","Glenroy","Broadmeadows") #+1
+sas <- c("Newmarket","Ascot Vale","Moonee Ponds","Essendon") #-4
 
 
 #Variables for while loop
@@ -72,17 +82,13 @@ while(stops <= length(buses$origin)) {
   #EXPRESS BUS
   if ((
       (org[stops] == first(express) && dest[stops] == express[2]) &&
-      (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == express[3]) &&
-      (lead(org,2)[stops] == express[3] && lead(dest,2)[stops] == express[4]) &&
-      (lead(org,3)[stops] == express[4] && lead(dest,3)[stops] == last(express))
-     )
+      (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == last(express))
+  )
       ||
     (
-      (org[stops] == last(express) && dest[stops] == express[4]) &&
-      (lead(org,1)[stops] == express[4] && lead(dest,1)[stops] == express[3]) &&
-      (lead(org,2)[stops] == express[3] && lead(dest,2)[stops] == express[2]) &&
-      (lead(org,3)[stops] == express[2] && lead(dest,3)[stops] == first(express))
-    ))
+      (org[stops] == last(express) && dest[stops] == express[2]) &&
+      (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == first(express))
+     ))
     {
       buses$type[stops:(stops+length(express)-2)] <- "Express"
       stops <- stops+length(express)-1
@@ -95,41 +101,35 @@ while(stops <= length(buses$origin)) {
     (lead(org,2)[stops] == ltd_express[3] && lead(dest,2)[stops] == ltd_express[4]) &&
     (lead(org,3)[stops] == ltd_express[4] && lead(dest,3)[stops] == ltd_express[5]) &&
     (lead(org,4)[stops] == ltd_express[5] && lead(dest,4)[stops] == ltd_express[6]) &&
-    (lead(org,5)[stops] == ltd_express[6] && lead(dest,5)[stops] == last(ltd_express))
+    (lead(org,5)[stops] == ltd_express[6] && lead(dest,5)[stops] == ltd_express[7]) &&
+    (lead(org,5)[stops] == ltd_express[7] && lead(dest,6)[stops] == last(ltd_express))
   )
   ||
-  ( #lasst = 7
-    (org[stops] == last(ltd_express) && dest[stops] == ltd_express[6]) &&
-    (lead(org,1)[stops] == ltd_express[6] && lead(dest,1)[stops] == ltd_express[5]) &&
-    (lead(org,2)[stops] == ltd_express[5] && lead(dest,2)[stops] == ltd_express[4]) &&
-    (lead(org,3)[stops] == ltd_express[4] && lead(dest,3)[stops] == ltd_express[3]) &&
-    (lead(org,4)[stops] == ltd_express[3] && lead(dest,4)[stops] == ltd_express[2]) &&
-    (lead(org,5)[stops] == ltd_express[2] && lead(dest,5)[stops] == first(ltd_express))
+  ( #last = 8
+    (org[stops] == last(ltd_express) && dest[stops] == ltd_express[7]) &&
+    (lead(org,1)[stops] == ltd_express[7] && lead(dest,1)[stops] == ltd_express[6]) &&
+    (lead(org,2)[stops] == ltd_express[6] && lead(dest,2)[stops] == ltd_express[5]) &&
+    (lead(org,3)[stops] == ltd_express[5] && lead(dest,3)[stops] == ltd_express[4]) &&
+    (lead(org,4)[stops] == ltd_express[4] && lead(dest,4)[stops] == ltd_express[3]) &&
+    (lead(org,5)[stops] == ltd_express[3] && lead(dest,5)[stops] == ltd_express[2]) &&
+    (lead(org,6)[stops] == ltd_express[2] && lead(dest,6)[stops] == first(ltd_express))
   ))
   {
     buses$type[stops:(stops+length(ltd_express)-2)] <- "LTD ltd_express"
     stops <- stops+length(ltd_express)-1
   }
-  
+
   #SAS BUS
   else if ((
     (org[stops] == first(sas) && dest[stops] == sas[2]) &&
     (lead(org,1)[stops] == sas[2] && lead(dest,1)[stops] == sas[3]) &&
-    (lead(org,2)[stops] == sas[3] && lead(dest,2)[stops] == sas[4]) &&
-    (lead(org,3)[stops] == sas[4] && lead(dest,3)[stops] == sas[5]) &&
-    (lead(org,4)[stops] == sas[5] && lead(dest,4)[stops] == sas[6]) &&
-    (lead(org,5)[stops] == sas[6] && lead(dest,5)[stops] == sas[7]) &&
-    (lead(org,6)[stops] == sas[7] && lead(dest,6)[stops] == last(sas))
+    (lead(org,2)[stops] == sas[3] && lead(dest,2)[stops] == sas[4])
   )
   ||
-  ( #lasst = 7
-    (org[stops] == last(sas) && dest[stops] == sas[7]) &&
-    (lead(org,1)[stops] == sas[7] && lead(dest,1)[stops] == sas[6]) &&
-    (lead(org,2)[stops] == sas[6] && lead(dest,2)[stops] == sas[5]) &&
-    (lead(org,3)[stops] == sas[5] && lead(dest,3)[stops] == sas[4]) &&
-    (lead(org,4)[stops] == sas[4] && lead(dest,4)[stops] == sas[3]) &&
-    (lead(org,5)[stops] == sas[3] && lead(dest,5)[stops] == sas[2]) &&
-    (lead(org,6)[stops] == sas[2] && lead(dest,6)[stops] == first(sas))
+  ( #last = 4
+    (org[stops] == last(sas) && dest[stops] == sas[3]) &&
+    (lead(org,1)[stops] == sas[3] && lead(dest,1)[stops] == sas[2]) &&
+    (lead(org,2)[stops] == sas[2] && lead(dest,2)[stops] == first(sas))
   ))
   {
     buses$type[stops:(stops+length(sas)-2)] <- "SAS"
@@ -173,7 +173,7 @@ railRep <- railRep %>% mutate(peak = sapply(tripDeparture,function(x){
   else {"Off Peak"}
 }))
 
-# if the destinationi is Caulfield, Westall or Malvern, the dwelltime = 0, then dwelltime/60
+# if the destinationi is Caulfield, Westall or Malvern, the dwelltime = 0, else dwelltime/60 to get minutes
 railRep$dwellAdj <- ifelse(railRep$destination %in% startpoints, 0, railRep$dwellTime/60)
                                 
 # travel_times <- railRep %>% 
@@ -201,8 +201,8 @@ leg_times <- railRep %>%
   group_by(tripId, origin, destination, peak, type, departure, arrival) %>%
   summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj))
 
-# leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
-#   summarise(TravelTimes = mean(TripTime))
+leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
+ summarise(TravelTimes = mean(TripTime))
 
 # write.csv(leg_times,paste0("CTD Bus Leg Times - ",date(Sys.time()-days(1)),".csv"))
 
@@ -231,4 +231,4 @@ merge_times <- merge_times[c( "CTD_ID"
                              ,"TripTime"
 )]
 
-write.csv(merge_times,paste0("CTD Bus Leg Time.csv"))
+write.csv(merge_times,paste0("Output//CGB Bus Leg Time.csv"))
