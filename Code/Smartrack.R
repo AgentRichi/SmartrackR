@@ -32,7 +32,7 @@ buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Ti
                          project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                          stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                          destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
-                         filter(hour(arrival) > 17) %>%
+                         filter(ymd_hms(arrival) > ymd_hms("2018-06-21 19:59:59 AEST")) %>%
   arrange(Resource.Name, seconds(Enter.Time))
 
 #format dwell time into seconds
@@ -59,6 +59,7 @@ buses$origin[1] <- "0"
 #Express (EXP): Flemington Racecourse - EXP Flag - Broadmeadows
 
 express <- c("Flemington","Full Exp Flag","Broadmeadows") #-2
+express_2 <- c("Flemington","Newmarket","Full Exp Flag","Broadmeadows") #-1
 ltd_express <- c("Flemington","Essendon","Glenbervie","Strathmore","Pascoe Vale","Oak Park","Glenroy","Broadmeadows") #+1
 sas <- c("Newmarket","Ascot Vale","Moonee Ponds","Essendon") #-4
 
@@ -80,7 +81,8 @@ while(stops <= length(buses$origin)) {
   dest = buses$destination
   
   #EXPRESS BUS
-  if ((
+  if (
+  (
       (org[stops] == first(express) && dest[stops] == express[2]) &&
       (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == last(express))
   )
@@ -88,7 +90,20 @@ while(stops <= length(buses$origin)) {
     (
       (org[stops] == last(express) && dest[stops] == express[2]) &&
       (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == first(express))
-     ))
+     )
+      ||
+  (
+    (org[stops] == first(express_2) && dest[stops] == express_2[2]) &&
+    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == express_2[3]) &&
+    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == last(express_2))
+  )
+  ||
+  (
+    (org[stops] == last(express_2) && dest[stops] == express_2[3]) &&
+    (lead(org,1)[stops] == express_2[3] && lead(dest,1)[stops] == express_2[2]) &&
+    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == first(express_2))
+  )
+  )
     {
       buses$type[stops:(stops+length(express)-2)] <- "Express"
       stops <- stops+length(express)-1
@@ -147,7 +162,8 @@ railRep <- buses %>% filter(type != "None") %>%
 
 
 #variables needed to work out trip ID
-startpoints <- c("Caulfield","Westall","Malvern")
+startpoints <- c("Broadmeadows","Flemington")
+sas_startpoints <- c("Essendon","Newmarket")
 new_trips <- railRep$origin %in% startpoints
 railRep$tripId <- c(rep(0,length(railRep$Resource.Name)))
 id = 0
@@ -155,9 +171,26 @@ id = 0
 # logic: if there is no origin (i.e. this is the first data point for the bus) OR 
 # if the origin is a startpoint, then the leg is part of a new trip
 for(leg in seq(1,length(railRep$origin))) {
-  railRep$tripId[leg] = ifelse(new_trips[leg],id+1,id)
-  id = ifelse(new_trips[leg],id+1,id)
+  if(railRep$type[leg] == "SAS" & railRep$origin[leg] %in% sas_startpoints) {
+    id = id+1
+    railRep$tripId[leg] <- id
+  } else if(railRep$type[leg] != "SAS" & railRep$origin[leg] %in% startpoints) {
+    id = id+1
+    railRep$tripId[leg] <- id
+  } else {
+  railRep$tripId[leg] <- id
+  }
 }
+  
+  
+  
+  ifelse(
+  (railRep$type == "SAS" & railRep$origin %in% sas_startpoints),
+  id+1, ifelse(
+    railRep$type != "SAS" & railRep$origin %in% startpoints,
+    id+1, id
+  )
+)
 
 # Determine the peak time
 tripDeparture <- railRep %>% filter(!duplicated(tripId)) %>%
@@ -204,11 +237,11 @@ leg_times <- railRep %>%
 leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
  summarise(TravelTimes = mean(TripTime))
 
-# write.csv(leg_times,paste0("CTD Bus Leg Times - ",date(Sys.time()-days(1)),".csv"))
+write.csv(leg_times,paste0("CTD Bus Leg Times - ",date(Sys.time()-days(1)),".csv"))
 
 merge_times <- merge(railRep, leg_times, by = c("tripId","type","peak","departure","arrival","origin","destination"), all.x = T)
 
-merge_times <- cbind("CTD_ID" = sprintf("CTD_ID_%06d", 1:nrow(merge_times)), merge_times)
+merge_times <- cbind("VCDI_ID" = sprintf("VCDI_ID_%06d", 1:nrow(merge_times)), merge_times)
 
 merge_times$tripId <- as.character(merge_times$tripId)
 
@@ -216,19 +249,33 @@ merge_times$tripId <- as.character(merge_times$tripId)
 
 tripTime_check <- subset(merge_times, merge_times$TripTime >= 30)
 
-merge_times <- merge_times[c( "CTD_ID"
-                             ,"tripId"
-                             ,"project"
-                             ,"Resource.Name"
-                             ,"Registration"
-                             ,"departure"
-                             ,"arrival"
-                             ,"type"
-                             ,"peak"
-                             ,"origin"
-                             ,"destination" 
-                             ,"dwellAdj"
-                             ,"TripTime"
+merge_times <- merge_times[c( "VCDI_ID"
+                              ,"tripId"
+                              ,"project"
+                              ,"Resource.Name"
+                              ,"Registration"
+                              ,"departure"
+                              ,"arrival"
+                              ,"type"
+                              ,"peak"
+                              ,"origin"
+                              ,"destination" 
+                              ,"dwellAdj"
+                              ,"TripTime"
 )]
 
-write.csv(merge_times,paste0("Output//CGB Bus Leg Time.csv"))
+write.csv(merge_times,paste0("Output/","CGB Bus Leg Times.csv"), row.names = F)
+
+
+# Total Travel Time
+
+travel_times <- railRep %>%
+  filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50) %>%
+  # !(tripId %in% c(77,127))
+  group_by(tripId, type, peak) %>%
+  summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj))
+
+ travel_times <- travel_times %>% group_by(type, peak) %>%
+   summarise(TravelTimes = mean(TripTime))
+
+write.csv(travel_times,paste0("Output/","CGB Bus Trip Times.csv"), row.names = F)
