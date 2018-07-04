@@ -1,6 +1,7 @@
 rm(list=ls(all=TRUE))
 
 library(dplyr)
+library(data.table)
 library(magrittr)
 library(lubridate)
 
@@ -32,7 +33,6 @@ buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Ti
                          project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                          stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                          destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
-                         filter(ymd_hms(arrival) > ymd_hms("2018-06-21 19:59:59 AEST")) %>%
   arrange(Resource.Name, seconds(Enter.Time))
 
 #format dwell time into seconds
@@ -76,13 +76,12 @@ buses$type <- c(rep(0,length(buses$Resource.Name)))
 #the trip is filtered out, even though it might be a legitimate replacement bus
 ############
 
-while(stops <= length(buses$origin)) {
+while(stops < length(buses$origin)) {
   org = buses$origin
   dest = buses$destination
   
   #EXPRESS BUS
-  if (
-  (
+  if ((
       (org[stops] == first(express) && dest[stops] == express[2]) &&
       (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == last(express))
   )
@@ -102,8 +101,7 @@ while(stops <= length(buses$origin)) {
     (org[stops] == last(express_2) && dest[stops] == express_2[3]) &&
     (lead(org,1)[stops] == express_2[3] && lead(dest,1)[stops] == express_2[2]) &&
     (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == first(express_2))
-  )
-  )
+  ))
     {
       buses$type[stops:(stops+length(express)-2)] <- "Express"
       stops <- stops+length(express)-1
@@ -144,7 +142,7 @@ while(stops <= length(buses$origin)) {
   ( #last = 4
     (org[stops] == last(sas) && dest[stops] == sas[3]) &&
     (lead(org,1)[stops] == sas[3] && lead(dest,1)[stops] == sas[2]) &&
-    (lead(org,2)[stops] == sas[2] && lead(dest,2)[stops] == first(sas))
+    (lead(org,2)[stops] == sas[2] && lead(dest,2)[stops] == sas[1])
   ))
   {
     buses$type[stops:(stops+length(sas)-2)] <- "SAS"
@@ -181,16 +179,14 @@ for(leg in seq(1,length(railRep$origin))) {
   railRep$tripId[leg] <- id
   }
 }
-  
-  
-  
-  ifelse(
-  (railRep$type == "SAS" & railRep$origin %in% sas_startpoints),
-  id+1, ifelse(
-    railRep$type != "SAS" & railRep$origin %in% startpoints,
-    id+1, id
-  )
-)
+
+# ifelse(
+#   (railRep$type == "SAS" & railRep$origin %in% sas_startpoints),
+#   id+1, ifelse(
+#     railRep$type != "SAS" & railRep$origin %in% startpoints,
+#     id+1, id
+#   )
+# )
 
 # Determine the peak time
 tripDeparture <- railRep %>% filter(!duplicated(tripId)) %>%
@@ -206,9 +202,58 @@ railRep <- railRep %>% mutate(peak = sapply(tripDeparture,function(x){
   else {"Off Peak"}
 }))
 
-# if the destinationi is Caulfield, Westall or Malvern, the dwelltime = 0, else dwelltime/60 to get minutes
-railRep$dwellAdj <- ifelse(railRep$destination %in% startpoints, 0, railRep$dwellTime/60)
-                                
+# if the destination OR origin is a start/end point then dwelltime = 0, else dwelltime/60 to get minutes
+#NOTE this is not entirely accurate, but to check dwell times at start/end, we need more validation
+#to ensure the bus was not sitting idle and actually picking up/dropping off passengers
+for(i in seq(1:length(railRep$dwellTime))) {
+  if (
+    ((railRep$destination[i] %in% startpoints || railRep$origin[i] %in% startpoints) && 
+     railRep$type[i] !="SAS") ||
+    ((railRep$destination[i] %in% sas_startpoints || railRep$origin[i] %in% sas_startpoints) && 
+     railRep$type[i] == "SAS")) {
+    railRep$dwellAdj[i] <- 0
+  } else {railRep$dwellAdj[i] <- railRep$dwellTime[i]/60}
+}
+
+##
+#REMOVE EXPRESS FLAGS
+##
+
+#Step 1: separate express buses
+exp_buses <- data.table(railRep[railRep$type=="Express",c("origin",
+                                                          "destination",
+                                                          "departure",
+                                                          "arrival",
+                                                          "tripId",
+                                                          "dwellAdj")],
+                        key = "tripId")
+
+#Step 2: For each trip, select org and dest, and sum up travel time
+exp_buses <- exp_buses[,list(
+  origin=first(origin),
+  destination=last(destination),
+  departure=first(departure),
+  arrival=last(arrival),
+  dwellAdj=sum(dwellAdj)),by=tripId] %>% 
+  
+#Step 3: join other columns from railrep table
+  left_join(railRep[,c("project",
+                       "Resource.Name",
+                       "Registration",
+                       "type",
+                       "tripId",
+                       "tripDeparture",
+                       "peak")],
+              by = "tripId")
+
+#Step 4: Combine express buses with other buses
+railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"],exp_buses)
+
+  # ifelse((
+  # (railRep$destination %in% startpoints && railRep$type !="SAS") 
+  # || 
+  # (railRep$origin %in% sas_startpoints && railRep$type == "SAS")),
+  # 0, railRep$dwellTime/60)
 # travel_times <- railRep %>% 
 #   filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50,
 #          !(tripId %in% c(77,127))) %>% 
@@ -226,13 +271,13 @@ railRep$dwellAdj <- ifelse(railRep$destination %in% startpoints, 0, railRep$dwel
 
 ###TO DO:
 #Add dwell times to total JT - Done
-#Calculate time for each leg of journey
+#Calculate time for each leg of journey - Done but need to deal with express flags
 
 leg_times <- railRep %>%
-  filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50,
-         !(tripId %in% c(77,127))) %>%
-  group_by(tripId, origin, destination, peak, type, departure, arrival) %>%
-  summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj))
+  filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50) %>%
+  group_by(tripId, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
+  summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
+  filter(date(departure) == date(arrival))
 
 # leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
 #  summarise(TravelTimes = mean(TripTime))
