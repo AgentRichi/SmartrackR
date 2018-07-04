@@ -282,7 +282,7 @@ leg_times <- railRep %>%
 # leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
 #  summarise(TravelTimes = mean(TripTime))
 
-write.csv(leg_times,paste0("CGB Bus Leg Times - ",date(Sys.time()-days(1)),".csv"))
+write.csv(leg_times,paste0("Output/CGB Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
 
 merge_times <- merge(railRep, leg_times, by = c("tripId","type","peak","departure","arrival","origin","destination"), all.x = T)
 
