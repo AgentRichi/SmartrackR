@@ -196,8 +196,8 @@ tripDeparture <- railRep %>% filter(!duplicated(tripId)) %>%
 railRep <- railRep %>% left_join(tripDeparture,"tripId")
 
 railRep <- railRep %>% mutate(peak = sapply(tripDeparture,function(x){
-  if(x>6 & x<10){"AM Peak"}
-  else if (x>9 & x<16){"Intra Peak"}
+  if(x>6 & x<9){"AM Peak"}
+  else if (x>8 & x<16){"Intra Peak"}
   else if (x>15 & x<19){"PM Peak"}
   else {"Off Peak"}
 }))
@@ -242,9 +242,10 @@ exp_buses <- exp_buses[,list(
                        "Registration",
                        "type",
                        "tripId",
+                       "origin",
                        "tripDeparture",
                        "peak")],
-              by = "tripId")
+              by = c("tripId","origin"))
 
 #Step 4: Combine express buses with other buses
 railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"],exp_buses)
@@ -274,7 +275,6 @@ railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"]
 #Calculate time for each leg of journey - Done but need to deal with express flags
 
 leg_times <- railRep %>%
-  filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50) %>%
   group_by(tripId, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
   summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
   filter(date(departure) == date(arrival))
@@ -284,7 +284,7 @@ leg_times <- railRep %>%
 
 write.csv(leg_times,paste0("Output/CGB Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
 
-merge_times <- merge(railRep, leg_times, by = c("tripId","type","peak","departure","arrival","origin","destination"), all.x = T)
+merge_times <- merge(leg_times, railRep, by = c("tripId","type","peak","departure","arrival","origin","destination","dwellAdj"), all.x = T)
 
 merge_times <- cbind("VCDI_ID" = sprintf("VCDI_ID_%06d", 1:nrow(merge_times)), merge_times)
 
@@ -315,12 +315,15 @@ write.csv(merge_times,paste0("Output/","CGB Bus Leg Times.csv"), row.names = F)
 # Total Travel Time
 
 travel_times <- railRep %>%
-  filter(difftime(arrival,departure, tz = "AEST", units = "mins") < 50) %>%
+  filter(date(departure) == date(arrival), type != "0") %>%
   # !(tripId %in% c(77,127))
-  group_by(tripId, type, peak) %>%
-  summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj))
+  group_by(tripId, type, peak, Resource.Name, date(departure)) %>%
+  summarise(origin = first(origin), destination = last(destination),
+            departure = first(departure), arrival = last(arrival),
+            TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
+  filter(TripTime < 100)
 
- travel_times <- travel_times %>% group_by(type, peak) %>%
-   summarise(TravelTimes = mean(TripTime))
+ # travel_times <- travel_times %>% group_by(type, peak) %>%
+ #   summarise(TravelTimes = mean(TripTime))
 
 write.csv(travel_times,paste0("Output/","CGB Bus Trip Times.csv"), row.names = F)
