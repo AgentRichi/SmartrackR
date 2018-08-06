@@ -4,9 +4,9 @@ library(dplyr)
 library(data.table)
 library(magrittr)
 library(lubridate)
-
-work_dir <- "C://Data//SmartrackR//"
-setwd(paste0(work_dir, ".//Data//"))
+library(xlsx)
+work_dir <- "C:/Data/Smartrack/"
+setwd(paste0(work_dir, "./Data/"))
 
 
 # Load the data
@@ -16,7 +16,7 @@ buses <- data.frame()
 for(i in 1:length(tfv_file))
 {
   buses <- rbind(buses,
-                     read.csv(tfv_file[i], header = TRUE,stringsAsFactors = F, skip=1))
+                     read.csv(tfv_file[i], header = TRUE,stringsAsFactors = F, skip=0))
 }
 
 setwd(work_dir)
@@ -58,15 +58,23 @@ buses$origin[1] <- "0"
 #Limited Express (LTD EXP): Flemington Racecourse - Essendon - Glenbervie - Strathmore - Pascoe Vale - Oak Park - Glenroy - Broadmeadows
 #Express (EXP): Flemington Racecourse - EXP Flag - Broadmeadows
 
-express <- c("Flemington","Full Exp Flag","Broadmeadows") #-2
-express_2 <- c("Flemington","Newmarket","Full Exp Flag","Broadmeadows") #-1
-ltd_express <- c("Flemington","Essendon","Glenbervie","Strathmore","Pascoe Vale","Oak Park","Glenroy","Broadmeadows") #+1
-sas <- c("Newmarket","Ascot Vale","Moonee Ponds","Essendon") #-4
+#CRAN-PAK Pt1
+# SAS: Dandenong - Hallam - Narre Warren - Berwick - Beaconsfield - Officer - Cardinia Road - Pakenham
+# SAS_Cran: Dandenong - Lynbrook - Merinda Park - Cranbourne
+# Ltd Exp: Dandenong - Berwick - Beaconsfield - Officer - Cardinia Road - Pakenham
+# Exp: Dandenong - Pakenham
+
+express <- c("Dandenong","Pakenham") #-1
+# express_2 <- c("Flemington","Newmarket","Full Exp Flag","Broadmeadows") #-1
+ltd_express <- c("Dandenong","Berwick","Beaconsfield","Officer","Cardinia Road","Pakenham") #-2
+sas_Pak <- c("Dandenong","Hallam","Narre Warren","Berwick","Beaconsfield","Officer","Cardinia Road","Pakenham") #+4
+sas <- c("Dandenong","Lynbrook","Merinda Park","Cranbourne") #0
 
 
 #Variables for while loop
 stops <- 1
 buses$type <- c(rep(0,length(buses$Resource.Name)))
+buses$direction <- c(rep(0,length(buses$Resource.Name)))
 
 
 #Iterate to assign bus type based on stopping pattern
@@ -81,73 +89,100 @@ while(stops < length(buses$origin)) {
   dest = buses$destination
   
   #EXPRESS BUS
-  if ((
-      (org[stops] == first(express) && dest[stops] == express[2]) &&
-      (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == last(express))
+  if (
+      (org[stops] == first(express) && dest[stops] == last(express))
   )
-      ||
-    (
-      (org[stops] == last(express) && dest[stops] == express[2]) &&
-      (lead(org,1)[stops] == express[2] && lead(dest,1)[stops] == first(express))
-     )
-      ||
-  (
-    (org[stops] == first(express_2) && dest[stops] == express_2[2]) &&
-    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == express_2[3]) &&
-    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == last(express_2))
+  {
+    buses$type[stops:(stops+length(express)-2)] <- "PAK Express"
+    buses$direction[stops:(stops+length(express)-2)] <- "up"
+    stops <- stops+length(express)-1
+  }
+  else if (
+      (org[stops] == last(express) && dest[stops] == first(express))
   )
-  ||
-  (
-    (org[stops] == last(express_2) && dest[stops] == express_2[3]) &&
-    (lead(org,1)[stops] == express_2[3] && lead(dest,1)[stops] == express_2[2]) &&
-    (lead(org,1)[stops] == express_2[2] && lead(dest,1)[stops] == first(express_2))
-  ))
-    {
-      buses$type[stops:(stops+length(express)-2)] <- "Express"
-      stops <- stops+length(express)-1
+  {
+    buses$type[stops:(stops+length(express)-2)] <- "PAK Express"
+    buses$direction[stops:(stops+length(express)-2)] <- "up"
+    stops <- stops+length(express)-1
   }
   
   #LTD EXPRESS BUS
-  else if ((
+  else if (
     (org[stops] == first(ltd_express) && dest[stops] == ltd_express[2]) &&
     (lead(org,1)[stops] == ltd_express[2] && lead(dest,1)[stops] == ltd_express[3]) &&
     (lead(org,2)[stops] == ltd_express[3] && lead(dest,2)[stops] == ltd_express[4]) &&
     (lead(org,3)[stops] == ltd_express[4] && lead(dest,3)[stops] == ltd_express[5]) &&
-    (lead(org,4)[stops] == ltd_express[5] && lead(dest,4)[stops] == ltd_express[6]) &&
-    (lead(org,5)[stops] == ltd_express[6] && lead(dest,5)[stops] == ltd_express[7]) &&
-    (lead(org,5)[stops] == ltd_express[7] && lead(dest,6)[stops] == last(ltd_express))
+    (lead(org,4)[stops] == ltd_express[5] && lead(dest,4)[stops] == last(ltd_express))
   )
-  ||
-  ( #last = 8
-    (org[stops] == last(ltd_express) && dest[stops] == ltd_express[7]) &&
-    (lead(org,1)[stops] == ltd_express[7] && lead(dest,1)[stops] == ltd_express[6]) &&
-    (lead(org,2)[stops] == ltd_express[6] && lead(dest,2)[stops] == ltd_express[5]) &&
-    (lead(org,3)[stops] == ltd_express[5] && lead(dest,3)[stops] == ltd_express[4]) &&
-    (lead(org,4)[stops] == ltd_express[4] && lead(dest,4)[stops] == ltd_express[3]) &&
-    (lead(org,5)[stops] == ltd_express[3] && lead(dest,5)[stops] == ltd_express[2]) &&
-    (lead(org,6)[stops] == ltd_express[2] && lead(dest,6)[stops] == first(ltd_express))
-  ))
   {
-    buses$type[stops:(stops+length(ltd_express)-2)] <- "LTD ltd_express"
+    buses$type[stops:(stops+length(ltd_express)-2)] <- "PAK LTD Express"
+    buses$direction[stops:(stops+length(ltd_express)-2)] <- "down"
+    stops <- stops+length(ltd_express)-1
+  }
+  else if ( #last = 6
+    (org[stops] == last(ltd_express) && dest[stops] == ltd_express[5]) &&
+    (lead(org,1)[stops] == ltd_express[5] && lead(dest,1)[stops] == ltd_express[4]) &&
+    (lead(org,2)[stops] == ltd_express[4] && lead(dest,2)[stops] == ltd_express[3]) &&
+    (lead(org,3)[stops] == ltd_express[3] && lead(dest,3)[stops] == ltd_express[2]) &&
+    (lead(org,4)[stops] == ltd_express[2] && lead(dest,4)[stops] == first(ltd_express))
+  )
+  {
+    buses$type[stops:(stops+length(ltd_express)-2)] <- "PAK LTD Express"
+    buses$direction[stops:(stops+length(ltd_express)-2)] <- "up"
     stops <- stops+length(ltd_express)-1
   }
 
-  #SAS BUS
-  else if ((
+  #SAS CRAN
+  else if (
     (org[stops] == first(sas) && dest[stops] == sas[2]) &&
     (lead(org,1)[stops] == sas[2] && lead(dest,1)[stops] == sas[3]) &&
     (lead(org,2)[stops] == sas[3] && lead(dest,2)[stops] == sas[4])
   )
-  ||
-  ( #last = 4
+  {
+    buses$type[stops:(stops+length(sas)-2)] <- "CRAN SAS"
+    buses$direction[stops:(stops+length(sas)-2)] <- "down"
+    stops <- stops+length(sas)-1
+  }
+  else if ( #last = 4
     (org[stops] == last(sas) && dest[stops] == sas[3]) &&
     (lead(org,1)[stops] == sas[3] && lead(dest,1)[stops] == sas[2]) &&
     (lead(org,2)[stops] == sas[2] && lead(dest,2)[stops] == sas[1])
-  ))
+  )
   {
-    buses$type[stops:(stops+length(sas)-2)] <- "SAS"
+    buses$type[stops:(stops+length(sas)-2)] <- "CRAN SAS"
+    buses$direction[stops:(stops+length(sas)-2)] <- "up"
     stops <- stops+length(sas)-1
   }
+  #SAS PAK
+  else if (
+    (org[stops] == first(sas_Pak) && dest[stops] == sas_Pak[2]) &&
+    (lead(org,1)[stops] == sas_Pak[2] && lead(dest,1)[stops] == sas_Pak[3]) &&
+    (lead(org,2)[stops] == sas_Pak[3] && lead(dest,2)[stops] == sas_Pak[4]) &&
+    (lead(org,3)[stops] == sas_Pak[4] && lead(dest,3)[stops] == sas_Pak[5]) &&
+    (lead(org,4)[stops] == sas_Pak[5] && lead(dest,4)[stops] == sas_Pak[6]) &&
+    (lead(org,5)[stops] == sas_Pak[6] && lead(dest,5)[stops] == sas_Pak[7]) &&
+    (lead(org,5)[stops] == sas_Pak[7] && lead(dest,6)[stops] == last(sas_Pak))
+  )
+  {
+    buses$type[stops:(stops+length(sas_Pak)-2)] <- "PAK SAS"
+    buses$direction[stops:(stops+length(sas_Pak)-2)] <- "down"
+    stops <- stops+length(sas_Pak)-1
+  }
+  else if ( #last = 8
+    (org[stops] == last(sas_Pak) && dest[stops] == sas_Pak[7]) &&
+    (lead(org,1)[stops] == sas_Pak[7] && lead(dest,1)[stops] == sas_Pak[6]) &&
+    (lead(org,2)[stops] == sas_Pak[6] && lead(dest,2)[stops] == sas_Pak[5]) &&
+    (lead(org,3)[stops] == sas_Pak[5] && lead(dest,3)[stops] == sas_Pak[4]) &&
+    (lead(org,4)[stops] == sas_Pak[4] && lead(dest,4)[stops] == sas_Pak[3]) &&
+    (lead(org,5)[stops] == sas_Pak[3] && lead(dest,5)[stops] == sas_Pak[2]) &&
+    (lead(org,6)[stops] == sas_Pak[2] && lead(dest,6)[stops] == first(sas_Pak))
+  )
+  {
+    buses$type[stops:(stops+length(sas_Pak)-2)] <- "PAK SAS"
+    buses$direction[stops:(stops+length(sas_Pak)-2)] <- "up"
+    stops <- stops+length(sas_Pak)-1
+  }
+  
   else {
     buses$type[stops] <- "None"
     stops <- stops+1
@@ -155,24 +190,23 @@ while(stops < length(buses$origin)) {
 }
 
 #remove non RRP Buses and unnecessary columns
-railRep <- buses %>% filter(type != "None") %>% 
-  select(project,Resource.Name,Registration,type,origin,destination,departure,arrival,dwellTime)
+railRep <- buses %>% filter(!(type %in% c("None",0))) %>% 
+  select(project,Resource.Name,Registration,type,direction,origin,destination,departure,arrival,dwellTime)
 
 
 #variables needed to work out trip ID
-startpoints <- c("Broadmeadows","Flemington")
-sas_startpoints <- c("Essendon","Newmarket")
-new_trips <- railRep$origin %in% startpoints
+Pak_startpoints <- c("Dandenong","Pakenham")
+Cran_startpoints <- c("Dandenong","Cranbourne")
 railRep$tripId <- c(rep(0,length(railRep$Resource.Name)))
 id = 0
 
 # logic: if there is no origin (i.e. this is the first data point for the bus) OR 
 # if the origin is a startpoint, then the leg is part of a new trip
 for(leg in seq(1,length(railRep$origin))) {
-  if(railRep$type[leg] == "SAS" & railRep$origin[leg] %in% sas_startpoints) {
+  if(railRep$type[leg] == "CRAN SAS" & railRep$origin[leg] %in% Cran_startpoints) {
     id = id+1
     railRep$tripId[leg] <- id
-  } else if(railRep$type[leg] != "SAS" & railRep$origin[leg] %in% startpoints) {
+  } else if(railRep$type[leg] != "CRAN SAS" & railRep$origin[leg] %in% Pak_startpoints) {
     id = id+1
     railRep$tripId[leg] <- id
   } else {
@@ -189,13 +223,13 @@ for(leg in seq(1,length(railRep$origin))) {
 # )
 
 # Determine the peak time
-tripDeparture <- railRep %>% filter(!duplicated(tripId)) %>%
-  select(tripId,departure) %>% mutate(tripDeparture = hour(departure)) %>%
-  select(tripId,tripDeparture)
+tripArrival <- railRep %>% filter(!duplicated(tripId)) %>%
+  select(tripId,arrival) %>% mutate(tripArrival = hour(arrival)) %>%
+  select(tripId,tripArrival)
 
-railRep <- railRep %>% left_join(tripDeparture,"tripId")
+railRep <- railRep %>% left_join(tripArrival,"tripId")
 
-railRep <- railRep %>% mutate(peak = sapply(tripDeparture,function(x){
+railRep <- railRep %>% mutate(peak = sapply(tripArrival,function(x){
   if(x>6 & x<9){"AM Peak"}
   else if (x>8 & x<16){"Intra Peak"}
   else if (x>15 & x<19){"PM Peak"}
@@ -207,48 +241,50 @@ railRep <- railRep %>% mutate(peak = sapply(tripDeparture,function(x){
 #to ensure the bus was not sitting idle and actually picking up/dropping off passengers
 for(i in seq(1:length(railRep$dwellTime))) {
   if (
-    ((railRep$destination[i] %in% startpoints || railRep$origin[i] %in% startpoints) && 
-     railRep$type[i] !="SAS") ||
-    ((railRep$destination[i] %in% sas_startpoints || railRep$origin[i] %in% sas_startpoints) && 
-     railRep$type[i] == "SAS")) {
+    ((railRep$destination[i] %in% Cran_startpoints || railRep$origin[i] %in% Cran_startpoints)) ||
+    ((railRep$destination[i] %in% Pak_startpoints || railRep$origin[i] %in% Pak_startpoints))
+  )
+    {
     railRep$dwellAdj[i] <- 0
   } else {railRep$dwellAdj[i] <- railRep$dwellTime[i]/60}
 }
 
-##
-#REMOVE EXPRESS FLAGS
-##
+# ##
+# #REMOVE EXPRESS FLAGS
+# ##
+# 
+# #Step 1: separate express buses
+# exp_buses <- data.table(railRep[railRep$type=="Express",c("origin",
+#                                                           "destination",
+#                                                           "departure",
+#                                                           "arrival",
+#                                                           "tripId",
+#                                                           "dwellAdj")],
+#                         key = "tripId")
+# 
+# #Step 2: For each trip, select org and dest, and sum up travel time
+# exp_buses <- exp_buses[,list(
+#   origin=first(origin),
+#   destination=last(destination),
+#   departure=first(departure),
+#   arrival=last(arrival),
+#   dwellAdj=sum(dwellAdj)),by=tripId] %>% 
+#   
+# #Step 3: join other columns from railrep table
+#   left_join(railRep[,c("project",
+#                        "Resource.Name",
+#                        "Registration",
+#                        "type",
+#                        "tripId",
+#                        "origin",
+#                        "tripDeparture",
+#                        "peak")],
+#               by = c("tripId","origin"))
+# 
+# #Step 4: Combine express buses with other buses
+# railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"],exp_buses)
 
-#Step 1: separate express buses
-exp_buses <- data.table(railRep[railRep$type=="Express",c("origin",
-                                                          "destination",
-                                                          "departure",
-                                                          "arrival",
-                                                          "tripId",
-                                                          "dwellAdj")],
-                        key = "tripId")
 
-#Step 2: For each trip, select org and dest, and sum up travel time
-exp_buses <- exp_buses[,list(
-  origin=first(origin),
-  destination=last(destination),
-  departure=first(departure),
-  arrival=last(arrival),
-  dwellAdj=sum(dwellAdj)),by=tripId] %>% 
-  
-#Step 3: join other columns from railrep table
-  left_join(railRep[,c("project",
-                       "Resource.Name",
-                       "Registration",
-                       "type",
-                       "tripId",
-                       "origin",
-                       "tripDeparture",
-                       "peak")],
-              by = c("tripId","origin"))
-
-#Step 4: Combine express buses with other buses
-railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"],exp_buses)
 
   # ifelse((
   # (railRep$destination %in% startpoints && railRep$type !="SAS") 
@@ -275,16 +311,16 @@ railRep <- rbind(railRep[railRep$type != "Express",names(railRep) !="dwellTime"]
 #Calculate time for each leg of journey - Done but need to deal with express flags
 
 leg_times <- railRep %>%
-  group_by(tripId, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
+  group_by(tripId, direction, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
   summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
   filter(date(departure) == date(arrival))
 
 # leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
 #  summarise(TravelTimes = mean(TripTime))
 
-write.csv(leg_times,paste0("Output/CGB Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
+write.csv(leg_times,paste0("Output/CRANPAK Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
 
-merge_times <- merge(leg_times, railRep, by = c("tripId","type","peak","departure","arrival","origin","destination","dwellAdj"), all.x = T)
+merge_times <- merge(leg_times, railRep, by = c("tripId","type","direction","peak","departure","arrival","origin","destination","dwellAdj"), all.x = T)
 
 merge_times <- cbind("VCDI_ID" = sprintf("VCDI_ID_%06d", 1:nrow(merge_times)), merge_times)
 
@@ -302,6 +338,7 @@ merge_times <- merge_times[c( "VCDI_ID"
                               ,"departure"
                               ,"arrival"
                               ,"type"
+                              ,"direction"
                               ,"peak"
                               ,"origin"
                               ,"destination" 
@@ -309,7 +346,7 @@ merge_times <- merge_times[c( "VCDI_ID"
                               ,"TripTime"
 )]
 
-write.csv(merge_times,paste0("Output/","CGB Bus Leg Times.csv"), row.names = F)
+write.csv(merge_times,paste0("Output/","CRANPAK Bus Leg Times.csv"), row.names = F)
 
 
 # Total Travel Time
@@ -317,13 +354,15 @@ write.csv(merge_times,paste0("Output/","CGB Bus Leg Times.csv"), row.names = F)
 travel_times <- railRep %>%
   filter(date(departure) == date(arrival), type != "0") %>%
   # !(tripId %in% c(77,127))
-  group_by(tripId, type, peak, Resource.Name, date(departure)) %>%
-  summarise(origin = first(origin), destination = last(destination),
-            departure = first(departure), arrival = last(arrival),
+  group_by(tripId, type, direction, peak, Resource.Name, date(departure)) %>%
+  summarise(Origin = first(origin), Destination = last(destination),
+            Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
   filter(TripTime < 100)
 
- # travel_times <- travel_times %>% group_by(type, peak) %>%
- #   summarise(TravelTimes = mean(TripTime))
+ journey_times <- travel_times %>% group_by(type, peak, direction) %>%
+   summarise(TravelTimes = mean(TripTime),
+             NumBuses = n())
 
-write.csv(travel_times,paste0("Output/","CGB Bus Trip Times.csv"), row.names = F)
+write.csv(travel_times,paste0("Output/","CRANPAK Bus Trip Times.csv"), row.names = F)
+write.csv(journey_times,paste0("Output/","CRANPAK Bus Journey Times.csv"), row.names = F)
