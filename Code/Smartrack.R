@@ -4,7 +4,7 @@ library(dplyr)
 library(data.table)
 library(magrittr)
 library(lubridate)
-library(xlsx)
+library(tibble)
 work_dir <- "C:/Data/Smartrack/"
 setwd(paste0(work_dir, "./Data/"))
 
@@ -63,13 +63,12 @@ buses$origin[1] <- "0"
 # SAS_Cran: Dandenong - Lynbrook - Merinda Park - Cranbourne
 # Ltd Exp: Dandenong - Berwick - Beaconsfield - Officer - Cardinia Road - Pakenham
 # Exp: Dandenong - Pakenham
-
 express <- c("Dandenong","Pakenham") #-1
 # express_2 <- c("Flemington","Newmarket","Full Exp Flag","Broadmeadows") #-1
 ltd_express <- c("Dandenong","Berwick","Beaconsfield","Officer","Cardinia Road","Pakenham") #-2
 sas_Pak <- c("Dandenong","Hallam","Narre Warren","Berwick","Beaconsfield","Officer","Cardinia Road","Pakenham") #+4
 sas <- c("Dandenong","Lynbrook","Merinda Park","Cranbourne") #0
-
+stations <- as.tibble(union(sas,sas_Pak)) %>% rowid_to_column("id") %>% rename(label=value)
 
 #Variables for while loop
 stops <- 1
@@ -318,7 +317,7 @@ leg_times <- railRep %>%
 # leg_times <- leg_times %>% group_by(origin,destination, peak, type) %>%
 #  summarise(TravelTimes = mean(TripTime))
 
-write.csv(leg_times,paste0("Output/CRANPAK Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
+# write.csv(leg_times,paste0("Output/CRANPAK Bus Leg Times - ",date(Sys.time()-days(1)),".csv"), row.names = F)
 
 merge_times <- merge(leg_times, railRep, by = c("tripId","type","direction","peak","departure","arrival","origin","destination","dwellAdj"), all.x = T)
 
@@ -346,7 +345,7 @@ merge_times <- merge_times[c( "VCDI_ID"
                               ,"TripTime"
 )]
 
-write.csv(merge_times,paste0("Output/","CRANPAK Bus Leg Times.csv"), row.names = F)
+# write.csv(merge_times,paste0("Output/","CRANPAK Bus Leg Times.csv"), row.names = F)
 
 
 # Total Travel Time
@@ -364,5 +363,6 @@ travel_times <- railRep %>%
    summarise(TravelTimes = mean(TripTime),
              NumBuses = n())
 
-write.csv(travel_times,paste0("Output/","CRANPAK Bus Trip Times.csv"), row.names = F)
-write.csv(journey_times,paste0("Output/","CRANPAK Bus Journey Times.csv"), row.names = F)
+# write.csv(travel_times,paste0("Output/","CRANPAK Bus Trip Times.csv"), row.names = F)
+# write.csv(journey_times,paste0("Output/","CRANPAK Bus Journey Times.csv"), row.names = F)
+ 
