@@ -313,6 +313,7 @@ write.csv(merge_times,paste0("Output/","CGB Bus Leg Times.csv"), row.names = F)
 
 
 # Total Travel Time
+up <- c("Broadmeadows","Essendon")
 
 travel_times <- railRep %>%
   filter(date(departure) == date(arrival), type != "0") %>%
@@ -320,7 +321,8 @@ travel_times <- railRep %>%
   group_by(tripId, type, peak, Resource.Name, date(departure)) %>%
   summarise(origin = first(origin), destination = last(destination),
             departure = first(departure), arrival = last(arrival),
-            TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
+            TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins"))) %>%
+  mutate(direction = ifelse(origin %in% up,"Up","Down")) %>%
   filter(TripTime < 100)
 
  # travel_times <- travel_times %>% group_by(type, peak) %>%
