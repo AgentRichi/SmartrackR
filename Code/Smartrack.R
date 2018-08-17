@@ -5,7 +5,7 @@ library(data.table)
 library(magrittr)
 library(lubridate)
 library(tibble)
-work_dir <- "C:/Data/Smartrack/"
+work_dir <- "C:/Data/SmartrackR/"
 setwd(paste0(work_dir, "./Data/"))
 
 
@@ -39,7 +39,7 @@ buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Ti
 tmp <- strsplit(buses$Time.Inside.Geofence..hh.mm.ss., split=":") %>% lapply(as.numeric,1)
 dwellTime <- do.call(rbind, lapply(tmp, rbind))
 dwellTime <- dwellTime[,1]*60*60 + dwellTime[,2]*60 + dwellTime[,3]
-buses$dwellTime <- dwellTime %>% seconds()
+buses$dwellTime <- dwellTime
 
 
 #calculate departure time (arrival+dwell) and get origin from preceding row
@@ -183,13 +183,13 @@ while(stops < length(buses$origin)) {
   }
   
   else {
-    buses$type[stops] <- "None"
+    buses$type[stops] <- "0"
     stops <- stops+1
     }
 }
 
 #remove non RRP Buses and unnecessary columns
-railRep <- buses %>% filter(!(type %in% c("None",0))) %>% 
+railRep <- buses %>% filter(type != "0" ) %>% 
   select(project,Resource.Name,Registration,type,direction,origin,destination,departure,arrival,dwellTime)
 
 
