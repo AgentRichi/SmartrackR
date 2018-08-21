@@ -30,7 +30,7 @@ color.gradient <- function(x, colors=c("#c9cba3","#ffe1a8","#e26d5c"), colsteps=
 }
 
 arcDiagram <- function(
-  edgelist, wd=5, sorted=TRUE, decreasing=FALSE, lwd=NULL,
+  edgelist, dat=5, categories = 1, sorted=TRUE, decreasing=FALSE, lwd=NULL,
   col=NULL, cex=NULL, col.nodes=NULL, lend=1, ljoin=2, lmitre=1,
   las=2, bg=NULL, mar=c(4,1,3,1))
 {
@@ -75,22 +75,47 @@ arcDiagram <- function(
   if (is.null(col.nodes)) col.nodes = rep("gray50", nn)
   if (length(col.nodes) != nn) col.nodes = rep(col.nodes, length=nn)
   if (is.null(bg)) bg = "white"
-  wd <- as.data.frame(wd) %>% sapply(as.numeric)
-  if (length(wd)==1) wd = rep(wd,nrow(edges))
+  dat <- as.data.frame(dat) %>% sapply(as.numeric)
+  if (length(dat)==1) wd = rep(dat,nrow(edges))
   # scale the weight
-  wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
-  print("line weights")
-  print(wd)
+  wd <- (dat-min(dat))/(max(dat)-min(dat))*10 +1
   wd.col <- color.gradient(wd)
+  
+  # wrap coordinates in 
+  
+  dataset <- cbind(edges,as.factor(categories)) %>% as.data.frame()
+  print(dataset)
+  dataset <- split(dataset,f=dataset[,3])
+  print(dataset)
+  centers <- c()
+  off.set <- 0
+  for (category in dataset) {
+    category <- category[1:2] %>% as.matrix()
+    nodes <- unique(as.vector(category))
+    nodes <- nodes[!(nodes %in% names(centers))]
+    nn = length(nodes)
+    if (nn>0) {
+      # node labels coordinates
+      nf = rep(1 / nn, nn)
+      # node labels center coordinates
+      fin = cumsum(nf)
+      ini = c(0, cumsum(nf)[-nn])
+      centers.new = (ini + fin) / 2 + off.set
+      names(centers.new) = nodes
+      centers <- append(centers, centers.new)
+      off.set = off.set-1
+    }
+  }
+  print(centers)
+
+  nn = length(nodes)
   # node labels coordinates
   nf = rep(1 / nn, nn)
   # node labels center coordinates
   fin = cumsum(nf)
   ini = c(0, cumsum(nf)[-nn])
   centers = (ini + fin) / 2
-  names(centers) = nodes
-  print("centers")
-  print(centers)
+    names(centers) = nodes
   # arcs coordinates
   # matrix with numeric indices
   e_num = matrix(0, nrow(edges), ncol(edges))
@@ -99,33 +124,19 @@ arcDiagram <- function(
     e_num[i,1] = centers[which(nodes == edges[i,1])]
     e_num[i,2] = centers[which(nodes == edges[i,2])]
   }
-  print("e_num")
-  print(e_num)
   # max arc radius
   # multiply by -1 to flip arcs
   radios = ((e_num[,1] - e_num[,2]) / 2) * -1
-  print("radios")
-  print(radios)
   max_radios = which(radios == max(radios))
-  print("max_radios")
-  print(max_radios)
   max_rad = unique(radios[max_radios] / 2)
-  print("max_rad")
-  print(max_rad)
   min_radios = which(radios == min(radios))
-  print("min_radios")
-  print(min_radios)
   min_rad = unique(radios[min_radios] / 2)
-  print("min_rad")
-  print(min_rad)
   # arc locations
   locs = rowSums(e_num) / 2
-  print("locs")
-  print(locs)
   #colors
   cols <- brewer.pal(8,"Set3")
   # plot
-  par(mar = mar, bg = bg)
+  # par(mar = mar, bg = bg)
   # plot.new()
   # plot.window(xlim=c(-0.025, 1.025), ylim=c(1*min_rad*2, 1*max_rad*2))
   p <- plot_ly()
@@ -140,30 +151,20 @@ arcDiagram <- function(
     #         lend=lend, ljoin=ljoin, lmitre=lmitre)
     radio = radios[i]
     x = locs[i] + radio * cos(z)
-    print("x")
-    print(head(x))
     y = radio * sin(z)
     y = y + ifelse(y[[2]]>0,0.01,-0.01) #move y up/down to show label
-    print("y")
-    print(head(y))
     width <- wd[i]
     color <- wd.col[i]
-    trace1 <- list(x = x,
+    txt <- paste0(colnames(dat),": ",format(dat[i],digits = 2))
+    p <- add_trace(p,
+                   x = x,
                    y = y, 
-                   hoverinfo = "none",
+                   hoverinfo = "text",
+                   text = txt,
                    line = list(color = color, shape = "spline", width = width),
                    mode = "lines",
                    name = "", 
-                   type = "scatter"
-    )
-    p <- add_trace(p, 
-                   x=trace1$x, 
-                   y=trace1$y, 
-                   hoverinfo=trace1$hoverinfo, 
-                   line=trace1$line, 
-                   mode=trace1$mode, 
-                   name=trace1$name, 
-                   type=trace1$type)
+                   type = "scatter")
   }
   
   axis_template <- list(showgrid = F , zeroline = F, showline = F, showticklabels = F)
@@ -171,6 +172,7 @@ arcDiagram <- function(
   
   p <- p %>%  add_text(x=centers,
                        y=0,
+                       hoverinfo = "none",
                        text = names(centers), 
                        textfont = list(color = '#000000', size = 14))  %>%
     layout(xaxis = axis_template,
@@ -199,7 +201,7 @@ destinations <- leg_times[4] %>% distinct(destination) %>% rename(label=destinat
 nodes <- stations
 
 edges <- leg_times %>% group_by(origin,destination) %>% 
-  summarise(weight=mean(TripTime))
+  summarise("Average Travel Time"=mean(TripTime))
 
 edges <- edges %>% 
   inner_join(nodes, by = c("origin" = "label")) %>% 
@@ -212,8 +214,8 @@ edges <- edges %>%
 #sort
 edges <- edges[with(edges, order(from,to)),]
 edges
-arcDiagram(as.matrix(edges[1:2]), wd = edges[3], sorted = F, lwd = 3,cex = 0.5)
-
+testcat <- c(0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,3,4)
+arcDiagram(as.matrix(edges[1:2]), dat = edges[3], categories = testcat, sorted = F, lwd = 3,cex = 0.5)
 # trace1 <- list(
 #   x = c(2.0, 1.99305941144, 1.98574643661, 1.97805434163, 1.96997690531, 1.96150847788, 1.95264404104, 1.94337926902, 1.93371059014, 1.92363524842, 1.91315136476, 1.90225799707, 1.89095519865, 1.87924407431, 1.86712683348, 1.85460683947, 1.84168865435, 1.82837807854, 1.81468218442, 1.80060934326, 1.78616924477, 1.77137290855, 1.75623268698, 1.74076225889, 1.72497661366, 1.70889202541, 1.69252601703, 1.675897314, 1.65902578797, 1.64193239031, 1.62463907603, 1.60716871832, 1.58954501452, 1.57179238419, 1.55393586006, 1.536000973, 1.51801363194, 1.5, 1.48198636806, 1.463999027, 1.44606413994, 1.42820761581, 1.41045498548, 1.39283128168, 1.37536092397, 1.35806760969, 1.34097421203, 1.324102686, 1.30747398297, 1.29110797459, 1.27502338634, 1.25923774111, 1.24376731302, 1.22862709145, 1.21383075523, 1.19939065674, 1.18531781558, 1.17162192146, 1.15831134565, 1.14539316053, 1.13287316652, 1.12075592569, 1.10904480135, 1.09774200293, 1.08684863524, 1.07636475158, 1.06628940986, 1.05662073098, 1.04735595896, 1.03849152212, 1.03002309469, 1.02194565837, 1.01425356339, 1.00694058856, 1.0), 
 #   y = c(0.0, 0.0117008799697, 0.0233885330354, 0.0350490995641, 0.0466680356158, 0.0582301236222, 0.0697194879132, 0.0811196154134, 0.0924133818105, 0.103583083462, 0.114610475273, 0.125476814724, 0.136162912176, 0.14664918753, 0.156915733214, 0.166942383435, 0.176708789515, 0.186194501058, 0.1953790526, 0.204242055282, 0.212763293013, 0.220922822464, 0.228701076161, 0.236078967845, 0.243037999191, 0.249560366887, 0.255629069045, 0.261228009841, 0.266342101259, 0.27095736081, 0.275061004089, 0.278641531075, 0.281688805103, 0.284194123531, 0.28615027919, 0.287551611814, 0.288394048777, 0.288675134595, 0.288394048777, 0.287551611814, 0.28615027919, 0.284194123531, 0.281688805103, 0.278641531075, 0.275061004089, 0.27095736081, 0.266342101259, 0.261228009841, 0.255629069045, 0.249560366887, 0.243037999191, 0.236078967845, 0.228701076161, 0.220922822464, 0.212763293013, 0.204242055282, 0.1953790526, 0.186194501058, 0.176708789515, 0.166942383435, 0.156915733214, 0.14664918753, 0.136162912176, 0.125476814724, 0.114610475273, 0.103583083462, 0.0924133818105, 0.0811196154134, 0.0697194879132, 0.0582301236222, 0.0466680356158, 0.0350490995641, 0.0233885330354, 0.0117008799697, 0.0), 
@@ -231,11 +233,68 @@ arcDiagram(as.matrix(edges[1:2]), wd = edges[3], sorted = F, lwd = 3,cex = 0.5)
 # p <- add_trace(p, x=trace1$x, y=trace1$y, hoverinfo=trace1$hoverinfo, line=trace1$line, mode=trace1$mode, name=trace1$name, type=trace1$type)
 # p %>% add_text(x=mean(trace1$x),y=max(trace1$y),text = "12")
 
-#Colorbrewer
-wd <- as.data.frame(wed) %>% sapply(as.numeric)
-wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
-rand.data <- wd
-br.range <- seq(min(rand.data),max(rand.data),length.out=10)
-results <- sapply(1:ncol(rand.data),function(x) hist(rand.data[,x],plot=F,br=br.range)$counts)
-cols <- brewer.pal(8,"Set3")
-lapply(1:ncol(results),function(x) print(cols[x]))
+# #Colorbrewer
+# wd <- as.data.frame(wed) %>% sapply(as.numeric)
+# wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
+# rand.data <- wd
+# br.range <- seq(min(rand.data),max(rand.data),length.out=10)
+# results <- sapply(1:ncol(rand.data),function(x) hist(rand.data[,x],plot=F,br=br.range)$counts)
+# cols <- brewer.pal(8,"Set3")
+# lapply(1:ncol(results),function(x) print(cols[x]))
+
+
+
+
+# # DRAW A ROUNDED RECTANGLE:
+# p <- plot_ly()
+# e_num <- matrix(c(0.04545455,0.04545455,0.13636364,0.59090909),ncol = 2)
+# # r = 0.025
+# # locs = rowSums(e_num) + r
+# height.in = ((e_num[,1] - e_num[,2]) / 4) * -1
+# radios = height.in/3
+# height.out = height.in + radios
+# radio = radios[1]
+# # line_1
+# x <- c(e_num[1,1],e_num[1,1])
+# y <- c(0,height.in[1])
+# # circle_1
+# z1 = seq(pi, pi/2, l=50)
+# c1.x = (e_num[1,1] + radio) + (radio * cos(z1))
+# x = c(x,c1.x)
+# c1.y = height.in[1] + (radio * sin(z1))
+# y = c(y,c1.y)
+# # line_horizontal
+# lh.x = (tail(x,1)+(tail(x,1)-head(x,1))/2)
+# x = c(x,lh.x)
+# y = c(y,tail(y,1))
+# # circle_2
+# # z1 = seq(0, pi/2 , l=50)
+# # c1.x = (e_num[1,1] + r) + r * cos(z1)
+# # x = c(x,c1.x)
+# # c1.y = height.in[1] + r * sin(z1)
+# # y = c(y,c1.y)
+# # line_2
+# p <- add_trace(p,x=x,y=y,                   mode = "lines",
+#                name = "", 
+#                type = "scatter")  %>%
+#   layout(
+#     xaxis = list(range = c(0, 0.2)),
+#     yaxis = list(range = c(0, 0.2)))
+# p
+# 
+# 
+# radios = ((e_num[,1] - e_num[,2]) / 2) * -1
+# locs = rowSums(e_num) / 2
+# # p <- plot_ly()
+# # plot connecting arcs
+# z = seq(pi, pi/2, l=100)
+# radio = radios[1]
+# x = locs[1] + radio * cos(z)
+# y = radio * sin(z)
+# p <- plot_ly() %>% add_trace(x=x,y=y,                   mode = "lines",
+#                name = "", 
+#                type = "scatter") %>%
+#   layout(
+#     xaxis = list(range = c(0, 0.2)),
+#     yaxis = list(range = c(0, 0.2)))
+# p

@@ -5,7 +5,7 @@ library(data.table)
 library(magrittr)
 library(lubridate)
 library(tibble)
-work_dir <- "C:/Data/Smartrack/"
+work_dir <- "C:/Data/SmartrackR/"
 setwd(paste0(work_dir, "./Data/"))
 
 
