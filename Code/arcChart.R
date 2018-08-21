@@ -83,16 +83,19 @@ arcDiagram <- function(
   
   # wrap coordinates in 
   
-  dataset <- cbind(edges,as.factor(categories)) %>% as.data.frame()
+  dataset <- as.data.frame(edges)
+  dataset$category <- categories
+  nodes <- unique(as.vector(dataset[,1:2]))
+  dataset <- split(dataset,f=dataset[,length(dataset)])
   print(dataset)
-  dataset <- split(dataset,f=dataset[,3])
-  print(dataset)
-  centers <- c()
+  centers <- data.frame(origin=as.character(),
+                        x.coord=as.numeric(),
+                        y.coord=as.numeric())
   off.set <- 0
   for (category in dataset) {
-    category <- category[1:2] %>% as.matrix()
+    category <- category[1] %>% as.matrix()
     nodes <- unique(as.vector(category))
-    nodes <- nodes[!(nodes %in% names(centers))]
+    nodes <- nodes[!(nodes %in% centers$origin)]
     nn = length(nodes)
     if (nn>0) {
       # node labels coordinates
@@ -100,39 +103,64 @@ arcDiagram <- function(
       # node labels center coordinates
       fin = cumsum(nf)
       ini = c(0, cumsum(nf)[-nn])
-      centers.new = (ini + fin) / 2 + off.set
-      names(centers.new) = nodes
-      centers <- append(centers, centers.new)
+      x.coord = (ini + fin) / 2
+      print(x.coord)
+      y.coord = off.set
+      print(y.coord)
+      origin = nodes
+      print(origin)
+      centers.new <- data.frame(origin=origin,
+                                x.coord=x.coord,
+                                y.coord=y.coord)
+      print(centers.new)
+      centers <- rbind(centers,centers.new)
       off.set = off.set-1
     }
   }
-  print(centers)
+  
+  edges.3 <- as.data.frame(edges)
+  edges.3 <- merge(edges.3,centers)
+  edges.3 <- merge(edges.3,centers,by.x = "destination", by.y = "origin")
+  edges.3$midpoint.x <- (edges.3$x.coord.x+edges.3$x.coord.y)/2
+  edges.3$midpoint.y <- (edges.3$y.coord.x+edges.3$y.coord.y)/2
+  
+  radios <- sqrt(
+    (edges.3$midpoint.x - edges.3$x.coord.x)^2 +
+      (edges.3$midpoint.y - edges.3$x.coord.y)^2 
+  )
+  
+  arc.start <- atan((edges.3$y.coord.x - edges.3$midpoint.y) /
+                      (edges.3$x.coord.x - edges.3$midpoint.x))
+  arc.end <- atan((edges.3$y.coord.y - edges.3$midpoint.y) /
+                    (edges.3$x.coord.y - edges.3$midpoint.x))
+  
 
-  nn = length(nodes)
-  # node labels coordinates
-  nf = rep(1 / nn, nn)
-  # node labels center coordinates
-  fin = cumsum(nf)
-  ini = c(0, cumsum(nf)[-nn])
-  centers = (ini + fin) / 2
-    names(centers) = nodes
-  # arcs coordinates
-  # matrix with numeric indices
-  e_num = matrix(0, nrow(edges), ncol(edges))
-  for (i in 1:nrow(edges))
-  {
-    e_num[i,1] = centers[which(nodes == edges[i,1])]
-    e_num[i,2] = centers[which(nodes == edges[i,2])]
-  }
+  # nn = length(nodes)
+  # # node labels coordinates
+  # nf = rep(1 / nn, nn)
+  # # node labels center coordinates
+  # fin = cumsum(nf)
+  # ini = c(0, cumsum(nf)[-nn])
+  # centers = (ini + fin) / 2
+  #   names(centers) = nodes
+  # # arcs coordinates
+  # # matrix with numeric indices
+  # e_num = matrix(0, nrow(edges), ncol(edges))
+  # for (i in 1:nrow(edges))
+  # {
+  #   e_num[i,1] = centers[which(nodes == edges[i,1])]
+  #   e_num[i,2] = centers[which(nodes == edges[i,2])]
+  # }
   # max arc radius
   # multiply by -1 to flip arcs
-  radios = ((e_num[,1] - e_num[,2]) / 2) * -1
-  max_radios = which(radios == max(radios))
-  max_rad = unique(radios[max_radios] / 2)
-  min_radios = which(radios == min(radios))
-  min_rad = unique(radios[min_radios] / 2)
+  #radios = ((e_num[,1] - e_num[,2]) / 2) * -1
+  # max_radios = which(radios == max(radios))
+  # max_rad = unique(radios[max_radios] / 2)
+  # min_radios = which(radios == min(radios))
+  # min_rad = unique(radios[min_radios] / 2)
   # arc locations
-  locs = rowSums(e_num) / 2
+  locs.x = edges.3$midpoint.x
+  locs.y = edges.3$midpoint.y
   #colors
   cols <- brewer.pal(8,"Set3")
   # plot
@@ -141,18 +169,24 @@ arcDiagram <- function(
   # plot.window(xlim=c(-0.025, 1.025), ylim=c(1*min_rad*2, 1*max_rad*2))
   p <- plot_ly()
   # plot connecting arcs
-  z = seq(0, pi, l=100)
   for (i in 1:nrow(edges))
   {
+    z = seq(arc.start[i]-pi, arc.end[i]+pi, l=100)
+    print("z")
+    print(z)
     #   radio = radios[i]
     #   x = locs[i] + radio * cos(z)
     #   y = radio * sin(z)
     #   lines(x, y, col=col[i], lwd=lwd[i], 
     #         lend=lend, ljoin=ljoin, lmitre=lmitre)
     radio = radios[i]
-    x = locs[i] + radio * cos(z)
-    y = radio * sin(z)
-    y = y + ifelse(y[[2]]>0,0.01,-0.01) #move y up/down to show label
+    print("radio")
+    print(radio)
+    x = locs.x[i] + radio * cos(z)
+    print(head(x))
+    y = locs.y[i] + radio * sin(z)
+    print(head(y))
+    #y = y + ifelse(y[[2]]>0,0.01,-0.01) #move y up/down to show label
     width <- wd[i]
     color <- wd.col[i]
     txt <- paste0(colnames(dat),": ",format(dat[i],digits = 2))
@@ -170,10 +204,10 @@ arcDiagram <- function(
   axis_template <- list(showgrid = F , zeroline = F, showline = F, showticklabels = F)
   
   
-  p <- p %>%  add_text(x=centers,
-                       y=0,
+  p <- p %>%  add_text(x=edges.3$x.coord.x,
+                       y=edges.3$y.coord.x,
                        hoverinfo = "none",
-                       text = names(centers), 
+                       text = edges.3$origin, 
                        textfont = list(color = '#000000', size = 14))  %>%
     layout(xaxis = axis_template,
            yaxis = axis_template,
@@ -214,7 +248,7 @@ edges <- edges %>%
 #sort
 edges <- edges[with(edges, order(from,to)),]
 edges
-testcat <- c(0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,3,4)
+testcat <- c(1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0)
 arcDiagram(as.matrix(edges[1:2]), dat = edges[3], categories = testcat, sorted = F, lwd = 3,cex = 0.5)
 # trace1 <- list(
 #   x = c(2.0, 1.99305941144, 1.98574643661, 1.97805434163, 1.96997690531, 1.96150847788, 1.95264404104, 1.94337926902, 1.93371059014, 1.92363524842, 1.91315136476, 1.90225799707, 1.89095519865, 1.87924407431, 1.86712683348, 1.85460683947, 1.84168865435, 1.82837807854, 1.81468218442, 1.80060934326, 1.78616924477, 1.77137290855, 1.75623268698, 1.74076225889, 1.72497661366, 1.70889202541, 1.69252601703, 1.675897314, 1.65902578797, 1.64193239031, 1.62463907603, 1.60716871832, 1.58954501452, 1.57179238419, 1.55393586006, 1.536000973, 1.51801363194, 1.5, 1.48198636806, 1.463999027, 1.44606413994, 1.42820761581, 1.41045498548, 1.39283128168, 1.37536092397, 1.35806760969, 1.34097421203, 1.324102686, 1.30747398297, 1.29110797459, 1.27502338634, 1.25923774111, 1.24376731302, 1.22862709145, 1.21383075523, 1.19939065674, 1.18531781558, 1.17162192146, 1.15831134565, 1.14539316053, 1.13287316652, 1.12075592569, 1.10904480135, 1.09774200293, 1.08684863524, 1.07636475158, 1.06628940986, 1.05662073098, 1.04735595896, 1.03849152212, 1.03002309469, 1.02194565837, 1.01425356339, 1.00694058856, 1.0), 
@@ -287,14 +321,63 @@ arcDiagram(as.matrix(edges[1:2]), dat = edges[3], categories = testcat, sorted =
 # locs = rowSums(e_num) / 2
 # # p <- plot_ly()
 # # plot connecting arcs
-# z = seq(pi, pi/2, l=100)
+# z = seq(0, pi, l=100)
 # radio = radios[1]
 # x = locs[1] + radio * cos(z)
-# y = radio * sin(z)
+# y = 2 + radio * sin(z)
 # p <- plot_ly() %>% add_trace(x=x,y=y,                   mode = "lines",
-#                name = "", 
-#                type = "scatter") %>%
-#   layout(
-#     xaxis = list(range = c(0, 0.2)),
-#     yaxis = list(range = c(0, 0.2)))
+#                name = "",
+#                type = "scatter")
 # p
+# 
+# edges.2 <- as.data.frame(edges)
+# edges.2$category <- testcat
+# nodes <- unique(as.vector(edges.2[,1:2]))
+# dataset <- split(dataset,f=dataset[,length(dataset)])
+# print(dataset)
+# centers <- data.frame(origin=as.character(),
+#                       x.coord=as.numeric(),
+#                       y.coord=as.numeric())
+# off.set <- 0
+# for (category in dataset) {
+#   category <- category[1] %>% as.matrix()
+#   nodes <- unique(as.vector(category))
+#   nodes <- nodes[!(nodes %in% centers$origin)]
+#   nn = length(nodes)
+#   if (nn>0) {
+#     # node labels coordinates
+#     nf = rep(1 / nn, nn)
+#     # node labels center coordinates
+#     fin = cumsum(nf)
+#     ini = c(0, cumsum(nf)[-nn])
+#     x.coord = (ini + fin) / 2
+#     print(x.coord)
+#     y.coord = off.set
+#     print(y.coord)
+#     origin = nodes
+#     print(origin)
+#     centers.new <- data.frame(origin=origin,
+#                               x.coord=x.coord,
+#                               y.coord=y.coord)
+#     print(centers.new)
+#     centers <- rbind(centers,centers.new)
+#     off.set = off.set-1
+#   }
+# }
+# 
+# edges.3 <- as.data.frame(edges[1:2])
+# edges.3 <- merge(edges.3,centers)
+# edges.3 <- merge(edges.3,centers,by.x = "destination", by.y = "origin")
+# edges.3$midpoint.x <- (edges.3$x.coord.x+edges.3$x.coord.y)/2
+# edges.3$midpoint.y <- (edges.3$y.coord.x+edges.3$y.coord.y)/2
+# radios <- sqrt(
+#   (edges.3$midpoint.x - edges.3$x.coord.x)^2 +
+#     (edges.3$midpoint.y - edges.3$x.coord.y)^2 
+# )
+# 
+# arc.start <- atan((edges.3$y.coord.x - edges.3$midpoint.y) /
+#                     (edges.3$x.coord.x - edges.3$midpoint.x))
+# arc.end <- atan((edges.3$y.coord.y - edges.3$midpoint.y) /
+#                     (edges.3$x.coord.y - edges.3$midpoint.x))
+# 
+# z = seq(0, pi, l=100)
