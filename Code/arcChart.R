@@ -30,7 +30,7 @@ color.gradient <- function(x, colors=c("#c9cba3","#ffe1a8","#e26d5c"), colsteps=
 }
 
 arcDiagram <- function(
-  edgelist, wd=5, sorted=TRUE, decreasing=FALSE, lwd=NULL,
+  edgelist, group=1, edgeweight=5, sorted=TRUE, decreasing=FALSE, lwd=NULL,
   col=NULL, cex=NULL, col.nodes=NULL, lend=1, ljoin=2, lmitre=1,
   las=2, bg=NULL, mar=c(4,1,3,1))
 {
@@ -75,12 +75,12 @@ arcDiagram <- function(
   if (is.null(col.nodes)) col.nodes = rep("gray50", nn)
   if (length(col.nodes) != nn) col.nodes = rep(col.nodes, length=nn)
   if (is.null(bg)) bg = "white"
-  wd <- as.data.frame(wd) %>% sapply(as.numeric)
+  
+  edgeweight <- as.data.frame(edgeweight) %>% sapply(as.numeric)
+  wd <- edgeweight
   if (length(wd)==1) wd = rep(wd,nrow(edges))
   # scale the weight
   wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
-  print("line weights")
-  print(wd)
   wd.col <- color.gradient(wd)
   # node labels coordinates
   nf = rep(1 / nn, nn)
@@ -89,8 +89,6 @@ arcDiagram <- function(
   ini = c(0, cumsum(nf)[-nn])
   centers = (ini + fin) / 2
   names(centers) = nodes
-  print("centers")
-  print(centers)
   # arcs coordinates
   # matrix with numeric indices
   e_num = matrix(0, nrow(edges), ncol(edges))
@@ -99,36 +97,29 @@ arcDiagram <- function(
     e_num[i,1] = centers[which(nodes == edges[i,1])]
     e_num[i,2] = centers[which(nodes == edges[i,2])]
   }
-  print("e_num")
-  print(e_num)
   # max arc radius
   # multiply by -1 to flip arcs
   radios = ((e_num[,1] - e_num[,2]) / 2) * -1
-  print("radios")
-  print(radios)
   max_radios = which(radios == max(radios))
-  print("max_radios")
-  print(max_radios)
   max_rad = unique(radios[max_radios] / 2)
-  print("max_rad")
-  print(max_rad)
   min_radios = which(radios == min(radios))
-  print("min_radios")
-  print(min_radios)
   min_rad = unique(radios[min_radios] / 2)
-  print("min_rad")
-  print(min_rad)
   # arc locations
   locs = rowSums(e_num) / 2
-  print("locs")
-  print(locs)
   #colors
   cols <- brewer.pal(8,"Set3")
   # plot
   par(mar = mar, bg = bg)
   # plot.new()
   # plot.window(xlim=c(-0.025, 1.025), ylim=c(1*min_rad*2, 1*max_rad*2))
-  p <- plot_ly()
+  p <- plot_ly(x=locs,
+               y=radios,
+               type='scatter',
+               mode='markers',
+               color=edgeweight, 
+               colors=color.gradient(c(1,2,3)),
+               marker=list(size=1, opacity=0),
+               hoverinfo = "none")
   # plot connecting arcs
   z = seq(0, pi, l=100)
   for (i in 1:nrow(edges))
@@ -140,49 +131,36 @@ arcDiagram <- function(
     #         lend=lend, ljoin=ljoin, lmitre=lmitre)
     radio = radios[i]
     x = locs[i] + radio * cos(z)
-    print("x")
-    print(head(x))
     y = radio * sin(z)
     y = y + ifelse(y[[2]]>0,0.01,-0.01) #move y up/down to show label
-    print("y")
-    print(head(y))
     width <- wd[i]
     color <- wd.col[i]
-    trace1 <- list(x = x,
+    txt <- paste0(edges[i,1]," to ",edges[i,2],"\n",colnames(edgeweight),": ",format(edgeweight[i],digits = 2))
+    p <- add_trace(p,
+                   x = x,
                    y = y, 
-                   hoverinfo = "none",
+                   hoverinfo = "text",
+                   text = txt,
                    line = list(color = color, shape = "spline", width = width),
                    mode = "lines",
-                   name = "", 
-                   type = "scatter"
-    )
-    p <- add_trace(p, 
-                   x=trace1$x, 
-                   y=trace1$y, 
-                   hoverinfo=trace1$hoverinfo, 
-                   line=trace1$line, 
-                   mode=trace1$mode, 
-                   name=trace1$name, 
-                   type=trace1$type)
+                   name = txt, 
+                   type = "scatter")
   }
   
   axis_template <- list(showgrid = F , zeroline = F, showline = F, showticklabels = F)
   
-  
   p <- p %>%  add_text(x=centers,
                        y=0,
-                       text = names(centers), 
-                       textfont = list(color = '#000000', size = 14))  %>%
+                       text = names(centers),
+                       textfont = list(color = '#000000', size = 12, weight="bold"))  %>%
     layout(xaxis = axis_template,
            yaxis = axis_template,
            showlegend = F)
   p
   # add node names
-  # mtext(nodes, side=1, line=0, at=centers, cex=cex, 
+  # mtext(nodes, side=1, line=0, at=centers, cex=cex,
   #       col=col.nodes, las=las)
 }
-
-
 
 
 
@@ -198,8 +176,8 @@ destinations <- leg_times[4] %>% distinct(destination) %>% rename(label=destinat
 
 nodes <- stations
 
-edges <- leg_times %>% group_by(origin,destination) %>% 
-  summarise(weight=mean(TripTime))
+edges <- leg_times %>% group_by(line,origin,destination) %>% 
+  summarise("Average Travel Time"=mean(TripTime))
 
 edges <- edges %>% 
   inner_join(nodes, by = c("origin" = "label")) %>% 
@@ -212,7 +190,7 @@ edges <- edges %>%
 #sort
 edges <- edges[with(edges, order(from,to)),]
 edges
-arcDiagram(as.matrix(edges[1:2]), wd = edges[3], sorted = F, lwd = 3,cex = 0.5)
+arcDiagram(as.matrix(edges[1:2]), edgeweight = edges[3], group=edges[1], sorted = F, lwd = 3,cex = 0.5)
 
 # trace1 <- list(
 #   x = c(2.0, 1.99305941144, 1.98574643661, 1.97805434163, 1.96997690531, 1.96150847788, 1.95264404104, 1.94337926902, 1.93371059014, 1.92363524842, 1.91315136476, 1.90225799707, 1.89095519865, 1.87924407431, 1.86712683348, 1.85460683947, 1.84168865435, 1.82837807854, 1.81468218442, 1.80060934326, 1.78616924477, 1.77137290855, 1.75623268698, 1.74076225889, 1.72497661366, 1.70889202541, 1.69252601703, 1.675897314, 1.65902578797, 1.64193239031, 1.62463907603, 1.60716871832, 1.58954501452, 1.57179238419, 1.55393586006, 1.536000973, 1.51801363194, 1.5, 1.48198636806, 1.463999027, 1.44606413994, 1.42820761581, 1.41045498548, 1.39283128168, 1.37536092397, 1.35806760969, 1.34097421203, 1.324102686, 1.30747398297, 1.29110797459, 1.27502338634, 1.25923774111, 1.24376731302, 1.22862709145, 1.21383075523, 1.19939065674, 1.18531781558, 1.17162192146, 1.15831134565, 1.14539316053, 1.13287316652, 1.12075592569, 1.10904480135, 1.09774200293, 1.08684863524, 1.07636475158, 1.06628940986, 1.05662073098, 1.04735595896, 1.03849152212, 1.03002309469, 1.02194565837, 1.01425356339, 1.00694058856, 1.0), 
@@ -232,10 +210,10 @@ arcDiagram(as.matrix(edges[1:2]), wd = edges[3], sorted = F, lwd = 3,cex = 0.5)
 # p %>% add_text(x=mean(trace1$x),y=max(trace1$y),text = "12")
 
 #Colorbrewer
-wd <- as.data.frame(wed) %>% sapply(as.numeric)
-wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
-rand.data <- wd
-br.range <- seq(min(rand.data),max(rand.data),length.out=10)
-results <- sapply(1:ncol(rand.data),function(x) hist(rand.data[,x],plot=F,br=br.range)$counts)
-cols <- brewer.pal(8,"Set3")
-lapply(1:ncol(results),function(x) print(cols[x]))
+# wd <- as.data.frame(wed) %>% sapply(as.numeric)
+# wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
+# rand.data <- wd
+# br.range <- seq(min(rand.data),max(rand.data),length.out=10)
+# results <- sapply(1:ncol(rand.data),function(x) hist(rand.data[,x],plot=F,br=br.range)$counts)
+# cols <- brewer.pal(8,"Set3")
+# lapply(1:ncol(results),function(x) print(cols[x]))
