@@ -30,7 +30,7 @@ color.gradient <- function(x, colors=c("#c9cba3","#ffe1a8","#e26d5c"), colsteps=
 }
 
 arcDiagram <- function(
-  edgelist, group=1, edgeweight=5, sorted=TRUE, decreasing=FALSE, lwd=NULL,
+  edgelist, group=1, edgeweight=5, sorted=FALSE, decreasing=FALSE, lwd=NULL,
   col=NULL, cex=NULL, col.nodes=NULL, lend=1, ljoin=2, lmitre=1,
   las=2, bg=NULL, mar=c(4,1,3,1))
 {
@@ -113,8 +113,8 @@ arcDiagram <- function(
   min_rad = unique(radios[min_radios] / 2)
   # arc locations
   locs = rowSums(e_num) / 2
-  #colors
-  cols <- brewer.pal(8,"Set3")
+  #node colors
+  cols <- 
   # plot
   par(mar = mar, bg = bg)
   # plot.new()

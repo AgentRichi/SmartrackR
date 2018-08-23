@@ -5,7 +5,7 @@ library(data.table)
 library(magrittr)
 library(lubridate)
 library(tibble)
-work_dir <- "C:/Data/Smartrack/"
+work_dir <- "C:/Data/SmartrackR/"
 setwd(paste0(work_dir, "./Data/"))
 
 
@@ -74,6 +74,7 @@ stations <- as.tibble(union(sas,sas_Pak)) %>% rowid_to_column("id") %>% rename(l
 stops <- 1
 buses$type <- c(rep(0,length(buses$Resource.Name)))
 buses$direction <- c(rep(0,length(buses$Resource.Name)))
+buses$line <- c(rep(0,length(buses$Resource.Name)))
 
 
 #Iterate to assign bus type based on stopping pattern
@@ -94,6 +95,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(express)-2)] <- "PAK Express"
     buses$direction[stops:(stops+length(express)-2)] <- "up"
+    buses$line[stops:(stops+length(express)-2)] <- "Pakenham"
     stops <- stops+length(express)-1
   }
   else if (
@@ -102,6 +104,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(express)-2)] <- "PAK Express"
     buses$direction[stops:(stops+length(express)-2)] <- "up"
+    buses$line[stops:(stops+length(express)-2)] <- "Pakenham"
     stops <- stops+length(express)-1
   }
   
@@ -116,6 +119,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(ltd_express)-2)] <- "PAK LTD Express"
     buses$direction[stops:(stops+length(ltd_express)-2)] <- "down"
+    buses$line[stops:(stops+length(ltd_express)-2)] <- "Pakenham"
     stops <- stops+length(ltd_express)-1
   }
   else if ( #last = 6
@@ -128,6 +132,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(ltd_express)-2)] <- "PAK LTD Express"
     buses$direction[stops:(stops+length(ltd_express)-2)] <- "up"
+    buses$line[stops:(stops+length(ltd_express)-2)] <- "Pakenham"
     stops <- stops+length(ltd_express)-1
   }
 
@@ -140,6 +145,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(sas)-2)] <- "CRAN SAS"
     buses$direction[stops:(stops+length(sas)-2)] <- "down"
+    buses$line[stops:(stops+length(sas)-2)] <- "Cranbourne"
     stops <- stops+length(sas)-1
   }
   else if ( #last = 4
@@ -150,6 +156,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(sas)-2)] <- "CRAN SAS"
     buses$direction[stops:(stops+length(sas)-2)] <- "up"
+    buses$line[stops:(stops+length(sas)-2)] <- "Cranbourne"
     stops <- stops+length(sas)-1
   }
   #SAS PAK
@@ -165,6 +172,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(sas_Pak)-2)] <- "PAK SAS"
     buses$direction[stops:(stops+length(sas_Pak)-2)] <- "down"
+    buses$line[stops:(stops+length(sas_Pak)-2)] <- "Pakenham"
     stops <- stops+length(sas_Pak)-1
   }
   else if ( #last = 8
@@ -179,6 +187,7 @@ while(stops < length(buses$origin)) {
   {
     buses$type[stops:(stops+length(sas_Pak)-2)] <- "PAK SAS"
     buses$direction[stops:(stops+length(sas_Pak)-2)] <- "up"
+    buses$line[stops:(stops+length(sas_Pak)-2)] <- "Pakenham"
     stops <- stops+length(sas_Pak)-1
   }
   
@@ -190,7 +199,7 @@ while(stops < length(buses$origin)) {
 
 #remove non RRP Buses and unnecessary columns
 railRep <- buses %>% filter(type != "0" ) %>% 
-  select(project,Resource.Name,Registration,type,direction,origin,destination,departure,arrival,dwellTime)
+  select(project,Resource.Name,Registration,type,line,direction,origin,destination,departure,arrival,dwellTime)
 
 
 #variables needed to work out trip ID
@@ -310,7 +319,7 @@ for(i in seq(1:length(railRep$dwellTime))) {
 #Calculate time for each leg of journey - Done but need to deal with express flags
 
 leg_times <- railRep %>%
-  group_by(tripId, direction, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
+  group_by(tripId, line, direction, origin, destination, peak, type, departure, arrival,dwellAdj) %>%
   summarise(TripTime = sum(difftime(arrival,departure, tz = "AEST", units = "mins")+dwellAdj)) %>%
   filter(date(departure) == date(arrival))
 
