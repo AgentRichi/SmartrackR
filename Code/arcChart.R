@@ -57,6 +57,12 @@ arcDiagram <- function(
   ne = nrow(edges)
   # get nodes
   nodes = unique(as.vector(edges))
+  categ <- unique(cbind(edges[,1],group))
+  names(categ) <- c("origin","line")
+  print(categ)
+  categ <- aggregate(line ~ origin,categ, paste, collapse = "/")
+  print("categ")
+  print(categ)
   nums = seq_along(nodes)
   # how many nodes
   nn = length(nodes)  
@@ -89,6 +95,7 @@ arcDiagram <- function(
   ini = c(0, cumsum(nf)[-nn])
   centers = (ini + fin) / 2
   names(centers) = nodes
+  print(centers)
   # arcs coordinates
   # matrix with numeric indices
   e_num = matrix(0, nrow(edges), ncol(edges))
@@ -113,12 +120,12 @@ arcDiagram <- function(
   # plot.new()
   # plot.window(xlim=c(-0.025, 1.025), ylim=c(1*min_rad*2, 1*max_rad*2))
   p <- plot_ly(x=locs,
-               y=radios,
+               y=0,
                type='scatter',
-               mode='markers',
+               mode = 'markers',
+               marker=list(size=1, opacity=0),
                color=edgeweight, 
                colors=color.gradient(c(1,2,3)),
-               marker=list(size=1, opacity=0),
                hoverinfo = "none")
   # plot connecting arcs
   z = seq(0, pi, l=100)
@@ -132,7 +139,7 @@ arcDiagram <- function(
     radio = radios[i]
     x = locs[i] + radio * cos(z)
     y = radio * sin(z)
-    y = y + ifelse(y[[2]]>0,0.01,-0.01) #move y up/down to show label
+    y = y + ifelse(y[[2]]>0,0.03,-0.01) #move y up/down to show label
     width <- wd[i]
     color <- wd.col[i]
     txt <- paste0(edges[i,1]," to ",edges[i,2],"\n",colnames(edgeweight),": ",format(edgeweight[i],digits = 2))
@@ -150,9 +157,32 @@ arcDiagram <- function(
   axis_template <- list(showgrid = F , zeroline = F, showline = F, showticklabels = F)
   
   p <- p %>%  add_text(x=centers,
-                       y=0,
+                       y=0.02,
                        text = names(centers),
-                       textfont = list(color = '#000000', size = 12, weight="bold"))  %>%
+                       textfont = list(color = '#000000', size = 12, weight="bold")) %>% 
+    add_trace(
+      x = centers,
+      y = 0,
+      marker = list(
+        color = 'rgb(255, 255, 255)',
+        size = 15,
+        opacity=1,
+        line = list(
+          color = 'rgb(0, 0, 0)',
+          width = 2
+        )
+      ),
+      showlegend = F
+    ) %>%
+    # add_trace(x=centers,
+    #           y=0,
+    #           marker = list(
+    #             color = 'rgb(17, 157, 255)',
+    #             size = 20,
+    #             line = list(
+    #               color = 'rgb(231, 99, 250)',
+    #               width = 2
+    #             ))) %>%
     layout(xaxis = axis_template,
            yaxis = axis_template,
            showlegend = F)
@@ -170,9 +200,9 @@ arcDiagram <- function(
 ################################################################
 # RUN Smartrack.R FIRST!!
 
-sources <- leg_times[3] %>% distinct(origin) %>% rename(label=origin)
+sources <- leg_times[4] %>% distinct(origin) %>% rename(label=origin)
 sources
-destinations <- leg_times[4] %>% distinct(destination) %>% rename(label=destination)
+destinations <- leg_times[5] %>% distinct(destination) %>% rename(label=destination)
 
 nodes <- stations
 
@@ -190,7 +220,7 @@ edges <- edges %>%
 #sort
 edges <- edges[with(edges, order(from,to)),]
 edges
-arcDiagram(as.matrix(edges[1:2]), edgeweight = edges[3], group=edges[1], sorted = F, lwd = 3,cex = 0.5)
+arcDiagram(as.matrix(edges[2:3]), edgeweight = edges[4], group=edges[1], sorted = F, lwd = 3,cex = 0.5)
 
 # trace1 <- list(
 #   x = c(2.0, 1.99305941144, 1.98574643661, 1.97805434163, 1.96997690531, 1.96150847788, 1.95264404104, 1.94337926902, 1.93371059014, 1.92363524842, 1.91315136476, 1.90225799707, 1.89095519865, 1.87924407431, 1.86712683348, 1.85460683947, 1.84168865435, 1.82837807854, 1.81468218442, 1.80060934326, 1.78616924477, 1.77137290855, 1.75623268698, 1.74076225889, 1.72497661366, 1.70889202541, 1.69252601703, 1.675897314, 1.65902578797, 1.64193239031, 1.62463907603, 1.60716871832, 1.58954501452, 1.57179238419, 1.55393586006, 1.536000973, 1.51801363194, 1.5, 1.48198636806, 1.463999027, 1.44606413994, 1.42820761581, 1.41045498548, 1.39283128168, 1.37536092397, 1.35806760969, 1.34097421203, 1.324102686, 1.30747398297, 1.29110797459, 1.27502338634, 1.25923774111, 1.24376731302, 1.22862709145, 1.21383075523, 1.19939065674, 1.18531781558, 1.17162192146, 1.15831134565, 1.14539316053, 1.13287316652, 1.12075592569, 1.10904480135, 1.09774200293, 1.08684863524, 1.07636475158, 1.06628940986, 1.05662073098, 1.04735595896, 1.03849152212, 1.03002309469, 1.02194565837, 1.01425356339, 1.00694058856, 1.0), 
