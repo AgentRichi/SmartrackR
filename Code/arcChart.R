@@ -155,10 +155,10 @@ arcDiagram <- function(
   }
   
   axis_template <- list(showgrid = F , zeroline = F, showline = F, showticklabels = F)
-  
+  m <- list(l = 0, r = 0, b = 0, t = 0, pad = 0)
   p <- p %>%  add_text(x=centers,
                        y=0.02,
-                       text = names(centers),
+                       text = paste0(substr(names(centers),1,5),"."),
                        textfont = list(color = '#000000', size = 12, weight="bold")) %>% 
     add_trace(
       x = centers,
@@ -185,7 +185,9 @@ arcDiagram <- function(
     #             ))) %>%
     layout(xaxis = axis_template,
            yaxis = axis_template,
-           showlegend = F)
+           showlegend = F,
+           margin = m
+           )
   p
   # add node names
   # mtext(nodes, side=1, line=0, at=centers, cex=cex,
@@ -200,27 +202,29 @@ arcDiagram <- function(
 ################################################################
 # RUN Smartrack.R FIRST!!
 
-sources <- leg_times[4] %>% distinct(origin) %>% rename(label=origin)
-sources
-destinations <- leg_times[5] %>% distinct(destination) %>% rename(label=destination)
+# sources <- leg_times[4] %>% distinct(origin) %>% rename(label=origin)
+# sources
+# destinations <- leg_times[5] %>% distinct(destination) %>% rename(label=destination)
 
-nodes <- stations
+stations <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CRANPAK.csv",stringsAsFactors = F)
 
-edges <- leg_times %>% group_by(line,origin,destination) %>% 
-  summarise("Average Travel Time"=mean(TripTime))
+nodes <- cbind(id=1:nrow(stations),stations)[,1:2]
 
-edges <- edges %>% 
-  inner_join(nodes, by = c("origin" = "label")) %>% 
-  rename(from = id)
+edges <- railRep %>% group_by(origin,destination) %>% 
+  summarise("Average Travel Time"=mean(legTime))
 
-edges <- edges %>% 
-  inner_join(nodes, by = c("destination" = "label")) %>% 
-  rename(to = id)
+# edges <- edges %>% 
+#   inner_join(nodes, by = c("origin" = "label")) %>% 
+#   rename(from = id)
+# 
+# edges <- edges %>% 
+#   inner_join(nodes, by = c("destination" = "label")) %>% 
+#   rename(to = id)
 
 #sort
 edges <- edges[with(edges, order(from,to)),]
 edges
-arcDiagram(as.matrix(edges[2:3]), edgeweight = edges[4], group=edges[1], sorted = F, lwd = 3,cex = 0.5)
+arcDiagram(as.matrix(edges[1:2]), edgeweight = edges[3], group = edges[2], sorted = F, lwd = 3,cex = 0.5)
 
 # trace1 <- list(
 #   x = c(2.0, 1.99305941144, 1.98574643661, 1.97805434163, 1.96997690531, 1.96150847788, 1.95264404104, 1.94337926902, 1.93371059014, 1.92363524842, 1.91315136476, 1.90225799707, 1.89095519865, 1.87924407431, 1.86712683348, 1.85460683947, 1.84168865435, 1.82837807854, 1.81468218442, 1.80060934326, 1.78616924477, 1.77137290855, 1.75623268698, 1.74076225889, 1.72497661366, 1.70889202541, 1.69252601703, 1.675897314, 1.65902578797, 1.64193239031, 1.62463907603, 1.60716871832, 1.58954501452, 1.57179238419, 1.55393586006, 1.536000973, 1.51801363194, 1.5, 1.48198636806, 1.463999027, 1.44606413994, 1.42820761581, 1.41045498548, 1.39283128168, 1.37536092397, 1.35806760969, 1.34097421203, 1.324102686, 1.30747398297, 1.29110797459, 1.27502338634, 1.25923774111, 1.24376731302, 1.22862709145, 1.21383075523, 1.19939065674, 1.18531781558, 1.17162192146, 1.15831134565, 1.14539316053, 1.13287316652, 1.12075592569, 1.10904480135, 1.09774200293, 1.08684863524, 1.07636475158, 1.06628940986, 1.05662073098, 1.04735595896, 1.03849152212, 1.03002309469, 1.02194565837, 1.01425356339, 1.00694058856, 1.0), 

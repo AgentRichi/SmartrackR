@@ -5,8 +5,8 @@ library(magrittr)
 library(lubridate)
 library(xlsx)
 
-work_dir <- "C:/Data/SmartrackR/"
-setwd(paste0(work_dir, "./Data/"))
+work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
+setwd(paste0(work_dir, ".\\Data\\"))
 
 #Function to determine which peak period the route belongs to
 peak <- function(x,am.start,am.end,pm.start,pm.end) {
@@ -196,6 +196,17 @@ travel_times <- railRep %>%
 journey_times <- travel_times %>% group_by(type, peak, direction) %>%
   summarise(TravelTimes = round(mean(TripTime),2),
             NumBuses = n())
+
+
+# join station data for stop order when drawing arcchart
+nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CRANPAK.csv",stringsAsFactors = F)
+nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
+railRep <- railRep %>% left_join(nodes,by=(c('origin'='label')))
+
+# write.csv(railRep,"./Output/railRep.csv")
+# write.csv(travel_times,"./Output/travel_times.csv")
+# write.csv(journey_times,"./Output/journey_times.csv")
+
 
 #metrics to calculate:
 
