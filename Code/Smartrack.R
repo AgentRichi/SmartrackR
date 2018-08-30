@@ -133,6 +133,7 @@ for(i in 1:nrow(routes)){
        (all.equal(des[stops:(stops+N-2)],pattern[2:N])==T)) {
       
       railRep$tripID[stops:(stops+N-2)] <- paste0(gsub(" ","",route$name),
+                                                  railRep$Resource.Name[stops],
                                                   sprintf("%06d",tripID))
       railRep$type[stops:(stops+N-2)] = route$name
       railRep$direction[stops:(stops+N-2)] = "UP"
@@ -151,6 +152,7 @@ for(i in 1:nrow(routes)){
             (all.equal(des[stops:(stops+N-2)],pattern.rev[2:N])==T)) {
       
       railRep$tripID[stops:(stops+N-2)] <- paste0(gsub(" ","",route$name),
+                                                  railRep$Resource.Name[stops],
                                                   sprintf("%06d",tripID))
       railRep$type[stops:(stops+N-2)] = route$name
       railRep$direction[stops:(stops+N-2)] = "DOWN"
@@ -188,7 +190,7 @@ railRep <- buses %>% filter(type != "0") %>%
   filter(legTime < 120)
 
 travel_times <- railRep %>%
-  group_by(tripID, type, direction, peak, Resource.Name, date(departure)) %>%
+  group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(legTime))
@@ -201,7 +203,26 @@ journey_times <- travel_times %>% group_by(type, peak, direction) %>%
 # join station data for stop order when drawing arcchart
 nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CRANPAK.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
-railRep <- railRep %>% left_join(nodes,by=(c('origin'='label')))
+
+# edges <- railRep %>% group_by(origin,destination) %>% 
+#   summarise("Number of Trips (sample)"=n(),
+#             "Average Travel Time"=mean(legTime))
+# 
+# edges <- edges %>%
+#   inner_join(nodes, by = c("origin" = "label")) %>%
+#   rename(from = sequence)
+# 
+# edges <- edges %>%
+#   inner_join(nodes, by = c("destination" = "label")) %>%
+#   rename(to = sequence)
+# 
+# #sort
+# edges <- edges[with(edges, order(from,to)),]
+
+railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>% 
+  left_join(nodes,by=(c('destination'='label'))) %>% rename(Seq.Org=sequence.x,Seq.Des=sequence.y)
+
+
 
 # write.csv(railRep,"./Output/railRep.csv")
 # write.csv(travel_times,"./Output/travel_times.csv")
