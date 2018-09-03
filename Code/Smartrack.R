@@ -5,7 +5,8 @@ library(magrittr)
 library(lubridate)
 library(xlsx)
 
-work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
+#work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
+work_dir <- "D:\\OneDrive - VicGov\\NIMP\\Smartrack"
 setwd(paste0(work_dir, ".\\Data\\"))
 
 #Function to determine which peak period the route belongs to
