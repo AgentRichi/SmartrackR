@@ -30,7 +30,7 @@ color.gradient <- function(x, colors=c("#c9cba3","#ffe1a8","#e26d5c"), colsteps=
 }
 
 arcDiagram <- function(
-  edgelist, edgeweight=5, edgecol=5, edgeseq=1, sorted=FALSE, decreasing=FALSE, lwd=NULL,
+  edgelist, edgeweight=5, edgecol=5, edgeseq=1, cols=c("#c9cba3","#ffe1a8","#e26d5c"), sorted=FALSE, decreasing=FALSE, lwd=NULL,
   col=NULL, cex=NULL, col.nodes=NULL, lend=1, ljoin=2, lmitre=1,
   las=2, bg=NULL, mar=c(4,1,3,1))
 {
@@ -101,7 +101,7 @@ arcDiagram <- function(
   wd <- (wd-min(wd))/(max(wd)-min(wd))*10 +1
   print("wd")
   print(str(wd))
-  wd.col <- color.gradient(edgecol)
+  wd.col <- color.gradient(edgecol,colors = cols)
   # node labels coordinates
   nf = rep(1 / nn, nn)
   # node labels center coordinates
@@ -136,8 +136,11 @@ arcDiagram <- function(
                mode = 'markers',
                marker=list(size=1, opacity=0),
                color=edgecol, 
-               colors=color.gradient(c(1,2,3)),
+               colors=color.gradient(1:length(cols),colors = cols),
                hoverinfo = "none")
+  print("cols")
+  print(cols)
+  print(color.gradient(1:length(cols),colors = cols))
   # plot connecting arcs
   z = seq(0, pi, l=100)
   for (i in 1:nrow(edges))
@@ -225,7 +228,7 @@ stations <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CR
 nodes <- cbind(id=1:nrow(stations),stations)[,1:2]
 
 edges <- railRep %>% group_by(origin,destination,Seq.Org,Seq.Des) %>% 
-  filter(direction=="DOWN") %>%
+  filter(project=="CGB") %>%
   summarise("Number of Trips (sample)"=n(),
             "Average Travel Time"=mean(legTime))
 
@@ -244,5 +247,6 @@ arcDiagram(as.matrix(edges[c('origin','destination')]),
            edgeweight = edges[c('Number of Trips (sample)')],
            edgecol = edges[c('Average Travel Time')],
            edgeseq = as.matrix(edges[c('Seq.Org','Seq.Des')]),
+           cols=c("#91A4A9","#C5001C"),
            sorted = T)
 

@@ -246,3 +246,12 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 
 # % Services on-time - # Buses delivered with an OD Journey time < 4 minutes and 59 seconds 
 # more than expected / # Valid trips observed
+
+# travel_times %>% group_by(type,Date = date(Departure)) %>%
+#   summarise(TravelTime = mean(TripTime)) %>% 
+#   plot_ly(x=~Date, 
+#           y=~TravelTime, 
+#           type='scatter', 
+#           mode="lines+markers", 
+#           color=~type)
+
