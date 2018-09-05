@@ -159,7 +159,7 @@ arcDiagram <- function(
     color <- wd.col[i]
     txt <- paste0(edges[i,1]," to ",edges[i,2],"\n",
                   colnames(edgecol),": ",format(edgecol[i],digits = 2),"\n",
-                  colnames(edgeweight),": ",edgeweight[i])
+                  colnames(edgeweight),": ",format(edgeweight[i],digits = 2))
     p <- add_trace(p,
                    x = x,
                    y = y, 

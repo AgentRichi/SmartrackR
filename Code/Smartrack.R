@@ -63,8 +63,13 @@ buses <- buses %>% filter(Geofence.Name != "")
 # for csv direct download use as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), format = '%d/%m/%Y %H:%M'))
 # for converted csv use as.POSIXct(Enter.Time), format = '%d/%m/%Y %I:%M:%S %p'
 # format arrival time and separate geofence name into columns, then order by bus and timestamp
-buses <- buses %>% mutate(arrival = as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), 
-                                                        format = '%d/%m/%Y %I:%M:%S %p')),
+arrival.1 = as.POSIXct(strptime(gsub('[\\.]','',buses$Enter.Time), 
+                              format = '%d/%m/%Y %I:%M:%S %p'))
+arrival.2 = as.POSIXct(strptime(gsub('[\\.]','',buses$Enter.Time), 
+                                format = '%d/%m/%Y %H:%M'))
+arrival.1[is.na(arrival.1)] <- arrival.2[is.na(arrival.1)]
+
+buses <- buses %>% mutate(arrival = arrival.1,
                           project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                           stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                           destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
@@ -219,7 +224,7 @@ train.OD <- fread("C:/Data/SUM/ServiceUSageModel_Train_May2017_People_Trip_OD_MA
 train.OD <- train.OD[transfer_point=="NULL"]
 # create unique timetable [O-D travel time x time of day (intervals)]
 
-timetable <- train.OD[,.(AvgTrainTime=mean((avg_trip_time*num_trips)/sum(num_trips))),
+timetable <- train.OD[,.(AvgTrainTime=mean(avg_trip_time)),
                       by=.(day_type,org=origin,des=destination,origin_departure_hour)] %>% 
   setkeyv(c("org","des","day_type","origin_departure_hour"))
 
@@ -242,6 +247,7 @@ railRep <- railRep %>% as.data.table() %>%
   setkeyv(c("org","des","day_type","origin_departure_hour"))
 railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
 railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
+railRep$JourneyTimeMagnitude <- (railRep$AdditionalJourneyTime)/railRep$AvgTrainTime
 
 railRep <- railRep %>% select(6:ncol(railRep))
 # write.csv(railRep,"./Output/railRep.csv")
