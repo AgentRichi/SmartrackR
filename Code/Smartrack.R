@@ -4,9 +4,10 @@ library(dplyr)
 library(magrittr)
 library(lubridate)
 library(xlsx)
+library(data.table)
 
-#work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
-work_dir <- "D:\\OneDrive - VicGov\\NIMP\\Smartrack"
+work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
+#work_dir <- "D:\\OneDrive - VicGov\\NIMP\\Smartrack"
 setwd(paste0(work_dir, ".\\Data\\"))
 
 #Function to determine which peak period the route belongs to
@@ -205,26 +206,44 @@ journey_times <- travel_times %>% group_by(type, peak, direction) %>%
 nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CRANPAK.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
 
-# edges <- railRep %>% group_by(origin,destination) %>% 
-#   summarise("Number of Trips (sample)"=n(),
-#             "Average Travel Time"=mean(legTime))
-# 
-# edges <- edges %>%
-#   inner_join(nodes, by = c("origin" = "label")) %>%
-#   rename(from = sequence)
-# 
-# edges <- edges %>%
-#   inner_join(nodes, by = c("destination" = "label")) %>%
-#   rename(to = sequence)
-# 
-# #sort
-# edges <- edges[with(edges, order(from,to)),]
-
 railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>% 
   left_join(nodes,by=(c('destination'='label'))) %>% rename(Seq.Org=sequence.x,Seq.Des=sequence.y)
 
 
+#######################
+# Delay Metric (additional journey time)
+#######################
 
+# load data
+train.OD <- fread("C:/Data/SUM/ServiceUSageModel_Train_May2017_People_Trip_OD_MAtrix_15Min.csv")
+train.OD <- train.OD[transfer_point=="NULL"]
+# create unique timetable [O-D travel time x time of day (intervals)]
+
+timetable <- train.OD[,.(AvgTrainTime=mean((avg_trip_time*num_trips)/sum(num_trips))),
+                      by=.(day_type,org=origin,des=destination,origin_departure_hour)] %>% 
+  setkeyv(c("org","des","day_type","origin_departure_hour"))
+
+# compare bus leg times to TT & calculate additional travel time
+railRep$origin_departure_hour <- hour(railRep$departure)
+
+wkdays <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
+wkends <- c("Saturday","Sunday")
+
+railRep$day_type <- weekdays(railRep$departure)
+railRep$day_type[railRep$day_type %in% wkdays] <- "weekday"
+railRep$day_type[railRep$day_type %in% wkends] <- "weekend"
+
+railRep$org <- tolower(railRep$origin)
+railRep$org[railRep$org=="flemington"] <- "newmarket"
+railRep$des <- tolower(railRep$destination)
+railRep$des[railRep$des=="flemington"] <- "newmarket"
+
+railRep <- railRep %>% as.data.table() %>% 
+  setkeyv(c("org","des","day_type","origin_departure_hour"))
+railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
+railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
+
+railRep <- railRep %>% select(6:ncol(railRep))
 # write.csv(railRep,"./Output/railRep.csv")
 # write.csv(travel_times,"./Output/travel_times.csv")
 # write.csv(journey_times,"./Output/journey_times.csv")
@@ -255,4 +274,3 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 #           type='scatter', 
 #           mode="lines+markers", 
 #           color=~type)
-
