@@ -105,6 +105,7 @@ buses$tripID <- c(rep(0,nrow(buses)))
 buses$type <- c(rep(0,nrow(buses)))
 buses$direction <- c(rep(0,nrow(buses)))
 buses$peak <- c(rep(0,nrow(buses)))
+buses$onTime <- c(rep(0,nrow(buses)))
 
 for(i in 1:nrow(routes)){
   
@@ -143,15 +144,16 @@ for(i in 1:nrow(routes)){
                                                   railRep$Resource.Name[stops],
                                                   sprintf("%06d",tripID))
       railRep$type[stops:(stops+N-2)] = route$name
-      railRep$direction[stops:(stops+N-2)] = "UP"
+      railRep$direction[stops:(stops+N-2)] <- "UP"
+      railRep$onTime[stops:(stops+N-2)] <- railRep$onTime[stops:(stops+N-2)] + route$additional.time
       railRep$peak[stops:(stops+N-2)] <- peak(railRep$arrival[(stops+N-2)],
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
       #remove dwelltime from final destination
-      railRep$dwellTime[(stops+N-2)] = 0
+      railRep$dwellTime[(stops+N-2)] <- 0
       
       tripID <- tripID+1
-      stops = stops+(N-1)
+      stops <- stops+(N-1)
     }
     
     #if bus is travelling in DOWN direction
@@ -161,16 +163,17 @@ for(i in 1:nrow(routes)){
       railRep$tripID[stops:(stops+N-2)] <- paste0(gsub(" ","",route$name),
                                                   railRep$Resource.Name[stops],
                                                   sprintf("%06d",tripID))
-      railRep$type[stops:(stops+N-2)] = route$name
-      railRep$direction[stops:(stops+N-2)] = "DOWN"
+      railRep$type[stops:(stops+N-2)] <- route$name
+      railRep$direction[stops:(stops+N-2)] <- "DOWN"
+      railRep$onTime[stops:(stops+N-2)] <- railRep$onTime[stops:(stops+N-2)] + route$additional.time
       railRep$peak[stops:(stops+N-2)] <- peak(railRep$departure[stops],
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
       #remove dwelltime from final destination
-      railRep$dwellTime[(stops+N-2)] = 0
+      railRep$dwellTime[(stops+N-2)] <- 0
       
       tripID <- tripID+1
-      stops = stops+(N-1)
+      stops <- stops+(N-1)
     }
     
     #else not a replacement bus
@@ -183,6 +186,7 @@ for(i in 1:nrow(routes)){
   buses$direction[match(railRep$ID,buses$ID)] <- railRep$direction
   buses$peak[match(railRep$ID,buses$ID)] <- railRep$peak
   buses$dwellTime[match(railRep$ID,buses$ID)] <- railRep$dwellTime
+  buses$onTime[match(railRep$ID,buses$ID)] <- railRep$onTime
 }
 
 ###########################
@@ -192,19 +196,9 @@ for(i in 1:nrow(routes)){
 #remove non RRP Buses and unnecessary columns
 railRep <- buses %>% filter(type != "0") %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
-         direction,origin,destination,departure,arrival,dwellTime) %>%
+         direction,origin,destination,departure,arrival,dwellTime,onTime) %>%
   mutate(legTime = round(difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)) %>%
-  filter(legTime < 120)
-
-travel_times <- railRep %>%
-  group_by(tripID, type, direction, peak, Resource.Name) %>%
-  summarise(Origin = first(origin), Destination = last(destination),
-            Departure = first(departure), Arrival = last(arrival),
-            TripTime = sum(legTime))
-
-journey_times <- travel_times %>% group_by(type, peak, direction) %>%
-  summarise(TravelTimes = round(mean(TripTime),2),
-            NumBuses = n())
+  filter(legTime < 120) %>% arrange_('tripID','arrival')
 
 
 # join station data for stop order when drawing arcchart
@@ -247,36 +241,46 @@ railRep <- railRep %>% as.data.table() %>%
   setkeyv(c("org","des","day_type","origin_departure_hour"))
 railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
 railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
-railRep$JourneyTimeMagnitude <- (railRep$AdditionalJourneyTime)/railRep$AvgTrainTime
 
-railRep <- railRep %>% select(6:ncol(railRep))
+#railRep <- railRep %>% select(6:ncol(railRep))
+
+#######################
+# Punctuality Metric (percent on time)
+#######################
+
+travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
+  group_by(tripID, type, direction, peak, Resource.Name) %>%
+  summarise(Origin = first(origin), Destination = last(destination),
+            Departure = first(departure), Arrival = last(arrival),
+            TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
+            XtraTime = first(onTime))
+travel_times$Punctual <- ifelse(travel_times$TripTime <= (travel_times$TrainTime+travel_times$XtraTime),1,0)
+
+
+journey_times <- travel_times %>% group_by(type, peak, direction) %>%
+  summarise(TravelTimes = round(mean(TripTime),2),
+            Punctuality = sum(Punctual),
+            NumBuses = n())
+
+journey_times$Punctuality <- journey_times$Punctuality / journey_times$NumBuses
+
 # write.csv(railRep,"./Output/railRep.csv")
 # write.csv(travel_times,"./Output/travel_times.csv")
 # write.csv(journey_times,"./Output/journey_times.csv")
-
-
 #metrics to calculate:
 
-# Bus OD journey time - Average journey time. 
+# Bus OD journey time : Average journey time. 
 # Suggest metric is daily average split by direction, time band 
 # (AM Peak, PM Peak, Non-Peak, Weekend, Public Holiday) and stopping pattern.
 
-# Additional journey time- Establish by time band and direction 
+# Additional journey time : Establish by time band and direction 
 # the average journey time through the affected area that a normal train/tram service 
 # would take and then measure the differential from actual bus journey time.
 
-# % Increased journey time - additional journey time / 'normal' journey time
+# % Increased journey time : additional journey time / 'normal' journey time
 # represented as an average with the same aggregations as the OD journey times.
 
-# Bus sample size - # Valid trips / # Buses allocated 
+# Bus sample size : # Valid trips / # Buses allocated 
 
-# % Services on-time - # Buses delivered with an OD Journey time < 4 minutes and 59 seconds 
+# % Services on-time : # Buses delivered with an OD Journey time < 4 minutes and 59 seconds 
 # more than expected / # Valid trips observed
-
-# travel_times %>% group_by(type,Date = date(Departure)) %>%
-#   summarise(TravelTime = mean(TripTime)) %>% 
-#   plot_ly(x=~Date, 
-#           y=~TravelTime, 
-#           type='scatter', 
-#           mode="lines+markers", 
-#           color=~type)

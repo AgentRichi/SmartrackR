@@ -74,6 +74,19 @@ arcDiagram <- function(
   # edgeweight <- edgesort[4] %>% as.data.frame() %>% sapply(as.numeric)
   # edgecol <- edgesort[5] %>% as.data.frame() %>% sapply(as.numeric)
   # 
+  
+  # Error handling
+  #check that the dataframe is not empty
+  if (length(edgeweight)==0) {
+    p <- plotly_empty() %>%  add_text(x=0,
+                                      y=0,
+                                      text = paste("Not enough data to produce plot,","\n","change filters and try again."),
+                                      textfont = list(color = '#ff0000', size = 24, weight="bold"))
+    internalSaveWidget(p, 'out.html');
+    quit()
+  }
+  
+  
   # how many edges
   ne = nrow(edges)
   # get nodes
