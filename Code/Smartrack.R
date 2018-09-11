@@ -73,7 +73,7 @@ buses <- buses %>% mutate(arrival = arrival.1,
                           project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                           stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                           destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
-  arrange(Resource.Name, seconds(Enter.Time))
+  arrange(Resource.Name, arrival)
 
 #format dwell time into seconds
 tmp <- strsplit(buses$Time.Inside.Geofence..hh.mm.ss., split=":") %>% lapply(as.numeric,1)
@@ -198,7 +198,7 @@ railRep <- buses %>% filter(type != "0") %>%
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
          direction,origin,destination,departure,arrival,dwellTime,onTime) %>%
   mutate(legTime = round(difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)) %>%
-  filter(legTime < 120) %>% arrange_('tripID','arrival')
+  filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
 
 
 # join station data for stop order when drawing arcchart
