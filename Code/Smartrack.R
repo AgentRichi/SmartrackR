@@ -46,7 +46,7 @@ setwd(work_dir)
 
 routes <- read.xlsx("Input/BusRoutes.xlsx",
                     sheetName = "BusRoutes", 
-                    stringsAsFactors=FALSE, 
+                    stringsAsFactors=FALSE,
                     as.data.frame = T) %>% na.omit()
 
 
@@ -55,7 +55,7 @@ routes <- read.xlsx("Input/BusRoutes.xlsx",
 ###########################
 
 routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")] <- force_tz(
-  routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")],tz="Australia/Sydney")
+  routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")],tz="UTC")
 
 buses <- buses %>% filter(Geofence.Name != "")
 
@@ -68,11 +68,12 @@ arrival.1 = as.POSIXct(strptime(gsub('[\\.]','',buses$Enter.Time),
 arrival.2 = as.POSIXct(strptime(gsub('[\\.]','',buses$Enter.Time), 
                                 format = '%d/%m/%Y %H:%M'))
 arrival.1[is.na(arrival.1)] <- arrival.2[is.na(arrival.1)]
+arrival.1 <- force_tz(arrival.1,tz="UTC")
 
 buses <- buses %>% mutate(arrival = arrival.1,
                           project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                           stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
-                          destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
+                           destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
   arrange(Resource.Name, arrival)
 
 #format dwell time into seconds
@@ -87,17 +88,17 @@ buses <- buses %>% mutate(departure = lag(dwellTime,1)+lag(arrival,1),
 buses$origin[1] <- "0"
 
 #assign ID
-buses <- cbind("ID" = sprintf("%06d", 1:nrow(buses)), buses)
+buses <- cbind("ID" = sprintf("%07d", 1:nrow(buses)), buses)
 
 ###########################
 # STEP 3: Assign Bus Routes
 ###########################
 
 #define peak periods
-am.start <- as.POSIXct("1899-12-30 7:00:00 AEST")
-am.end <- as.POSIXct("1899-12-30 9:00:00 AEST")
-pm.start <- as.POSIXct("1899-12-30 15:30:00 AEST")
-pm.end <- as.POSIXct("1899-12-30 19:00:00 AEST")
+am.start <- as.POSIXct("1899-12-30 7:00:00") %>% force_tz(tz="UCT")
+am.end <- as.POSIXct("1899-12-30 9:00:00 UTC") %>% force_tz(tz="UCT")
+pm.start <- as.POSIXct("1899-12-30 15:30:00 UTC") %>% force_tz(tz="UCT")
+pm.end <- as.POSIXct("1899-12-30 19:00:00 UTC") %>% force_tz(tz="UCT")
 
 #compare bus stopping pattern to route and assign name
 #for loop variables
@@ -140,9 +141,9 @@ for(i in 1:nrow(routes)){
     if((all.equal(org[stops:(stops+N-2)],pattern[1:(N-1)])==T) && 
        (all.equal(des[stops:(stops+N-2)],pattern[2:N])==T)) {
       
-      railRep$tripID[stops:(stops+N-2)] <- paste0(gsub(" ","",route$name),
-                                                  railRep$Resource.Name[stops],
-                                                  sprintf("%06d",tripID))
+      railRep$tripID[stops:(stops+N-2)] <- paste(gsub(" ","",route$name),
+                                                 railRep$Resource.Name[stops],
+                                                 railRep$departure[stops])
       railRep$type[stops:(stops+N-2)] = route$name
       railRep$direction[stops:(stops+N-2)] <- "UP"
       railRep$onTime[stops:(stops+N-2)] <- railRep$onTime[stops:(stops+N-2)] + route$additional.time
@@ -160,9 +161,9 @@ for(i in 1:nrow(routes)){
     else if((all.equal(org[stops:(stops+N-2)],pattern.rev[1:(N-1)])==T) && 
             (all.equal(des[stops:(stops+N-2)],pattern.rev[2:N])==T)) {
       
-      railRep$tripID[stops:(stops+N-2)] <- paste0(gsub(" ","",route$name),
+      railRep$tripID[stops:(stops+N-2)] <- paste(gsub(" ","",route$name),
                                                   railRep$Resource.Name[stops],
-                                                  sprintf("%06d",tripID))
+                                                  railRep$departure[stops])
       railRep$type[stops:(stops+N-2)] <- route$name
       railRep$direction[stops:(stops+N-2)] <- "DOWN"
       railRep$onTime[stops:(stops+N-2)] <- railRep$onTime[stops:(stops+N-2)] + route$additional.time
@@ -198,11 +199,11 @@ railRep <- buses %>% filter(type != "0") %>%
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
          direction,origin,destination,departure,arrival,dwellTime,onTime) %>%
   mutate(legTime = round(difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)) %>%
-  filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
+   filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
 
 
 # join station data for stop order when drawing arcchart
-nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/CRANPAK.csv",stringsAsFactors = F)
+nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/stops.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
 
 railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>% 
