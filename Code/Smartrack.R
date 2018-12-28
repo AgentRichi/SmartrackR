@@ -71,7 +71,6 @@ arrival.1[is.na(arrival.1)] <- arrival.2[is.na(arrival.1)]
 arrival.1 <- force_tz(arrival.1,tz="UTC")
 
 buses <- buses %>% mutate(arrival = arrival.1,
-                          project = unlist(lapply(strsplit(Geofence.Name," - "),'[[',2)),
                           stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
                            destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
   arrange(Resource.Name, arrival)
@@ -84,7 +83,8 @@ buses$dwellTime <- dwellTime
 
 #calculate departure time (arrival+dwell) and get origin from preceding row
 buses <- buses %>% mutate(departure = lag(dwellTime,1)+lag(arrival,1),
-                          origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0"))
+                          origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+  filter(origin != destination)
 buses$origin[1] <- "0"
 
 #assign ID
@@ -107,6 +107,7 @@ buses$type <- c(rep(0,nrow(buses)))
 buses$direction <- c(rep(0,nrow(buses)))
 buses$peak <- c(rep(0,nrow(buses)))
 buses$onTime <- c(rep(0,nrow(buses)))
+buses$project <- c(rep(0,nrow(buses)))
 
 for(i in 1:nrow(routes)){
   
@@ -114,13 +115,15 @@ for(i in 1:nrow(routes)){
   route <- routes[i,]
   pattern <- unlist(strsplit(route$stops,",")) %>% trimws() %>% toupper()
   pattern.rev <- unlist(strsplit(route$stops,",")) %>% trimws() %>% toupper() %>% rev()
-  
+  ignore <- unlist(strsplit(route$passes,",")) %>% trimws() %>% toupper()
   #Filter dataset to dates and times
   railRep <- buses %>% filter(departure >= route$start.datetime &
                                 arrival <= route$end.datetime &
                                 between(as.numeric(format(arrival,"%H%M%S")),
                                         as.numeric(format(route$start.time.filter,"%H%M%S")),
-                                        as.numeric(format(route$end.time.filter,"%H%M%S"))))
+                                        as.numeric(format(route$end.time.filter,"%H%M%S"))),
+                              !origin %in% ignore, 
+                              !destination %in% ignore)
   
   #adjust peak periods
   peak.adjust <- minutes(route$peak.adjust)
@@ -150,6 +153,7 @@ for(i in 1:nrow(routes)){
       railRep$peak[stops:(stops+N-2)] <- peak(railRep$arrival[(stops+N-2)],
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
+      railRep$project[stops:(stops+N-2)] <- route$project
       #remove dwelltime from final destination
       railRep$dwellTime[(stops+N-2)] <- 0
       
@@ -170,6 +174,7 @@ for(i in 1:nrow(routes)){
       railRep$peak[stops:(stops+N-2)] <- peak(railRep$departure[stops],
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
+      railRep$project[stops:(stops+N-2)] <- route$project
       #remove dwelltime from final destination
       railRep$dwellTime[(stops+N-2)] <- 0
       
