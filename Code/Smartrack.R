@@ -193,6 +193,7 @@ for(i in 1:nrow(routes)){
   buses$peak[match(railRep$ID,buses$ID)] <- railRep$peak
   buses$dwellTime[match(railRep$ID,buses$ID)] <- railRep$dwellTime
   buses$onTime[match(railRep$ID,buses$ID)] <- railRep$onTime
+  buses$project[match(railRep$ID,buses$ID)] <- railRep$project
 }
 
 ###########################
