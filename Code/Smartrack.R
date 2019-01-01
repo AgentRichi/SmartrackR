@@ -241,30 +241,47 @@ railRep$day_type[railRep$day_type %in% wkends] <- "weekend"
 
 railRep$org <- tolower(railRep$origin)
 railRep$org[railRep$org=="flemington"] <- "newmarket"
+railRep$org[railRep$org=="arts centre"] <- "flinders street"
+railRep$org[railRep$org=="federation square"] <- "flinders street"
 railRep$des <- tolower(railRep$destination)
 railRep$des[railRep$des=="flemington"] <- "newmarket"
+railRep$des[railRep$des=="arts centre"] <- "flinders street"
+railRep$des[railRep$des=="federation square"] <- "flinders street"
 
 railRep <- railRep %>% as.data.table() %>% 
   setkeyv(c("org","des","day_type","origin_departure_hour"))
 railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
 railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
-
+railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- railRep$legTime
 #railRep <- railRep %>% select(6:ncol(railRep))
 
 #######################
 # Punctuality Metric (percent on time)
 #######################
 
+#CODE FOR TRAVEL TIMES TABLE
 travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
             XtraTime = first(onTime))
-travel_times$Punctual <- ifelse(travel_times$TripTime <= (travel_times$TrainTime+travel_times$XtraTime),1,0)
+
+travel_times$Punctual <- ifelse(is.na(travel_times$TrainTime),
+                                ifelse(travel_times$TripTime <= (travel_times$XtraTime),1,0),
+                                ifelse(travel_times$TripTime <= (travel_times$TrainTime+travel_times$XtraTime),1,0))
 
 
-journey_times <- travel_times %>% group_by(type, peak, direction) %>%
+#CODE FOR RAIL REP AND JOURNEY TIMES TABLES
+journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
+  group_by(tripID, type, direction, peak, Resource.Name) %>%
+  summarise(Origin = first(origin), Destination = last(destination),
+            Departure = first(departure), Arrival = last(arrival),
+            TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
+            XtraTime = first(onTime)) %>% group_by(type, peak, direction) %>%
+  mutate(Punctual = ifelse(is.na(TrainTime),
+                           ifelse(TripTime <= (XtraTime),1,0),
+                           ifelse(TripTime <= (TrainTime+XtraTime),1,0))) %>%
   summarise(TravelTimes = round(mean(TripTime),2),
             Punctuality = sum(Punctual),
             NumBuses = n())
