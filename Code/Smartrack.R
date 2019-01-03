@@ -252,7 +252,7 @@ railRep <- railRep %>% as.data.table() %>%
   setkeyv(c("org","des","day_type","origin_departure_hour"))
 railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
 railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
-railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- railRep$legTime
+railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- railRep$legTime[is.na(railRep$AdditionalJourneyTime)]
 #railRep <- railRep %>% select(6:ncol(railRep))
 
 #######################
@@ -278,19 +278,30 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime)) %>% group_by(type, peak, direction) %>%
+            XtraTime = first(onTime), Date = as.Date(first(departure))) %>% 
+  group_by(type, peak, direction, Date) %>%
   mutate(Punctual = ifelse(is.na(TrainTime),
                            ifelse(TripTime <= (XtraTime),1,0),
                            ifelse(TripTime <= (TrainTime+XtraTime),1,0))) %>%
   summarise(TravelTimes = round(mean(TripTime),2),
+            ExpectedTravelTime = round(mean(ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),2),
+            Difference = round(mean(TripTime - ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),2),
             Punctuality = sum(Punctual),
-            NumBuses = n())
+            NumBuses = n()) %>% arrange(Date)
 
-journey_times$Punctuality <- journey_times$Punctuality / journey_times$NumBuses
+journey_times$Punctuality <- round(journey_times$Punctuality / journey_times$NumBuses,2)
 
-# write.csv(railRep,"./Output/railRep.csv")
-# write.csv(travel_times,"./Output/travel_times.csv")
-# write.csv(journey_times,"./Output/journey_times.csv")
+#Refresh/create files with yesterdays and todays Peak travel information
+write.csv(filter(journey_times,
+                 (peak=="AM Peak" | peak=="PM Peak"),
+                 Date == Sys.Date()-1),
+          paste0("Output/RRBJourneyTimes_",Sys.Date()-1,".csv"))
+
+write.csv(filter(journey_times,
+                 (peak=="AM Peak" | peak=="PM Peak"),
+                 Date == Sys.Date()),
+          paste0("Output/RRBJourneyTimes_",Sys.Date(),".csv"))
+
 #metrics to calculate:
 
 # Bus OD journey time : Average journey time. 
