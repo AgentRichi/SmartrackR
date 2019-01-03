@@ -284,7 +284,8 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
                            ifelse(TripTime <= (XtraTime),1,0),
                            ifelse(TripTime <= (TrainTime+XtraTime),1,0))) %>%
   summarise(TravelTimes = round(mean(TripTime),2),
-            ExpectedTravelTime = round(mean(ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),2),
+            ExpectedTravelTime = round(mean(ifelse(is.na(TrainTime),0,TrainTime)),2),
+            AdditionalTravelTime = round(mean(XtraTime),2),
             Difference = round(mean(TripTime - ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),2),
             Punctuality = sum(Punctual),
             NumBuses = n()) %>% arrange(Date)
