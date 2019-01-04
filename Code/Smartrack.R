@@ -6,6 +6,13 @@ library(lubridate)
 library(xlsx)
 library(data.table)
 
+#function to append rows during bus validation
+dt.append <- function(x1, x2) {
+  obj <- deparse(substitute(x1)) # get the actual object name as a string
+  assign(obj, value = data.table::rbindlist(list(x1, x2)), envir = .GlobalEnv)
+  
+}
+
 work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
 #work_dir <- "D:\\OneDrive - VicGov\\NIMP\\Smartrack"
 setwd(paste0(work_dir, ".\\Data\\"))
@@ -109,6 +116,7 @@ buses$peak <- c(rep(0,nrow(buses)))
 buses$onTime <- c(rep(0,nrow(buses)))
 buses$project <- c(rep(0,nrow(buses)))
 
+buses.valid <- buses[0,]
 for(i in 1:nrow(routes)){
   
   #route stopping patterns
@@ -116,14 +124,18 @@ for(i in 1:nrow(routes)){
   pattern <- unlist(strsplit(route$stops,",")) %>% trimws() %>% toupper()
   pattern.rev <- unlist(strsplit(route$stops,",")) %>% trimws() %>% toupper() %>% rev()
   ignore <- unlist(strsplit(route$passes,",")) %>% trimws() %>% toupper()
+  
   #Filter dataset to dates and times
-  railRep <- buses %>% filter(departure >= route$start.datetime &
-                                arrival <= route$end.datetime &
-                                between(as.numeric(format(arrival,"%H%M%S")),
-                                        as.numeric(format(route$start.time.filter,"%H%M%S")),
-                                        as.numeric(format(route$end.time.filter,"%H%M%S"))),
-                              !origin %in% ignore, 
-                              !destination %in% ignore)
+  railRep <- buses %>% filter(!(toupper(destination) %in% ignore)) %>% 
+    mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+           origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+    filter(origin != destination) %>%
+    filter(departure >= route$start.datetime &
+             arrival <= route$end.datetime &
+             between(as.numeric(format(arrival,"%H%M%S")),
+                     as.numeric(format(route$start.time.filter,"%H%M%S")),
+                     as.numeric(format(route$end.time.filter,"%H%M%S")))) %>%
+    filter(origin != destination)
   
   #adjust peak periods
   peak.adjust <- minutes(route$peak.adjust)
@@ -185,15 +197,18 @@ for(i in 1:nrow(routes)){
     #else not a replacement bus
     else(stops = stops+1)
   }
-  
+  railRep <- railRep %>% filter(type != "0")
   #assign replacement buses according to ID
-  buses$tripID[match(railRep$ID,buses$ID)] <- railRep$tripID
-  buses$type[match(railRep$ID,buses$ID)] <- railRep$type
-  buses$direction[match(railRep$ID,buses$ID)] <- railRep$direction
-  buses$peak[match(railRep$ID,buses$ID)] <- railRep$peak
-  buses$dwellTime[match(railRep$ID,buses$ID)] <- railRep$dwellTime
-  buses$onTime[match(railRep$ID,buses$ID)] <- railRep$onTime
-  buses$project[match(railRep$ID,buses$ID)] <- railRep$project
+  buses.valid <- dt.append(buses.valid,railRep)
+  # buses$tripID[match(railRep$ID,buses$ID)] <- railRep$tripID
+  # buses$departure[match(railRep$ID,buses$ID)] <- railRep$departure
+  # buses$origin[match(railRep$ID,buses$ID)] <- railRep$origin
+  # buses$type[match(railRep$ID,buses$ID)] <- railRep$type
+  # buses$direction[match(railRep$ID,buses$ID)] <- railRep$direction
+  # buses$peak[match(railRep$ID,buses$ID)] <- railRep$peak
+  # buses$dwellTime[match(railRep$ID,buses$ID)] <- railRep$dwellTime
+  # buses$onTime[match(railRep$ID,buses$ID)] <- railRep$onTime
+  # buses$project[match(railRep$ID,buses$ID)] <- railRep$project
 }
 
 ###########################
@@ -201,10 +216,10 @@ for(i in 1:nrow(routes)){
 ###########################
 
 #remove non RRP Buses and unnecessary columns
-railRep <- buses %>% filter(type != "0") %>% 
+railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
          direction,origin,destination,departure,arrival,dwellTime,onTime) %>%
-  mutate(legTime = round(difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)) %>%
+  mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2) %>%
    filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
 
 
@@ -222,7 +237,8 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 
 # load data
 train.OD <- fread("C:/Data/SUM/ServiceUSageModel_Train_May2017_People_Trip_OD_MAtrix_15Min.csv")
-train.OD <- train.OD[transfer_point=="NULL"]
+transfers <- c("NULL","flinders street","parliament","southern cross","north melbourne","melbourne central","flagstaff")
+train.OD <- train.OD[transfer_point %in% transfers]
 # create unique timetable [O-D travel time x time of day (intervals)]
 
 timetable <- train.OD[,.(AvgTrainTime=mean(avg_trip_time)),
@@ -272,7 +288,7 @@ travel_times$Punctual <- ifelse(is.na(travel_times$TrainTime),
                                 ifelse(travel_times$TripTime <= (travel_times$TrainTime+travel_times$XtraTime),1,0))
 
 
-#CODE FOR RAIL REP AND JOURNEY TIMES TABLES
+#CODE FOR JOURNEY TIMES TABLE
 journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
@@ -283,10 +299,11 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   mutate(Punctual = ifelse(is.na(TrainTime),
                            ifelse(TripTime <= (XtraTime),1,0),
                            ifelse(TripTime <= (TrainTime+XtraTime),1,0))) %>%
-  summarise(TravelTimes = round(mean(TripTime),2),
-            ExpectedTravelTime = round(mean(ifelse(is.na(TrainTime),0,TrainTime)),2),
-            AdditionalTravelTime = round(mean(XtraTime),2),
-            Difference = round(mean(TripTime - ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),2),
+  summarise(TravelTimes = mean(TripTime),
+            ExpectedTravelTime = mean(ifelse(is.na(TrainTime),TripTime-0,TripTime-TrainTime)), 
+            # ^this is actually delay, name is to avoid breaking references
+            AdditionalTravelTime = mean(XtraTime),
+            Difference = mean(TripTime - ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),
             Punctuality = sum(Punctual),
             NumBuses = n()) %>% arrange(Date)
 
