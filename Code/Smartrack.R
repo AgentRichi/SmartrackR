@@ -115,6 +115,7 @@ buses$direction <- c(rep(0,nrow(buses)))
 buses$peak <- c(rep(0,nrow(buses)))
 buses$onTime <- c(rep(0,nrow(buses)))
 buses$project <- c(rep(0,nrow(buses)))
+buses$interchange <- c(rep("-",nrow(buses)))
 
 buses.valid <- buses[0,]
 for(i in 1:nrow(routes)){
@@ -166,6 +167,7 @@ for(i in 1:nrow(routes)){
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
       railRep$project[stops:(stops+N-2)] <- route$project
+      railRep$interchange[(stops+N-2)] <- route$interchange
       #remove dwelltime from final destination
       railRep$dwellTime[(stops+N-2)] <- 0
       
@@ -187,6 +189,7 @@ for(i in 1:nrow(routes)){
                                               am.start.route,am.end.route,
                                               pm.start.route,pm.end.route)
       railRep$project[stops:(stops+N-2)] <- route$project
+      railRep$interchange[stops] <- route$interchange
       #remove dwelltime from final destination
       railRep$dwellTime[(stops+N-2)] <- 0
       
@@ -198,17 +201,7 @@ for(i in 1:nrow(routes)){
     else(stops = stops+1)
   }
   railRep <- railRep %>% filter(type != "0")
-  #assign replacement buses according to ID
   buses.valid <- dt.append(buses.valid,railRep)
-  # buses$tripID[match(railRep$ID,buses$ID)] <- railRep$tripID
-  # buses$departure[match(railRep$ID,buses$ID)] <- railRep$departure
-  # buses$origin[match(railRep$ID,buses$ID)] <- railRep$origin
-  # buses$type[match(railRep$ID,buses$ID)] <- railRep$type
-  # buses$direction[match(railRep$ID,buses$ID)] <- railRep$direction
-  # buses$peak[match(railRep$ID,buses$ID)] <- railRep$peak
-  # buses$dwellTime[match(railRep$ID,buses$ID)] <- railRep$dwellTime
-  # buses$onTime[match(railRep$ID,buses$ID)] <- railRep$onTime
-  # buses$project[match(railRep$ID,buses$ID)] <- railRep$project
 }
 
 ###########################
@@ -218,7 +211,7 @@ for(i in 1:nrow(routes)){
 #remove non RRP Buses and unnecessary columns
 railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
-         direction,origin,destination,departure,arrival,dwellTime,onTime) %>%
+         direction,origin,destination,interchange,departure,arrival,dwellTime,onTime) %>%
   mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2) %>%
    filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
 
@@ -239,15 +232,23 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 train.OD <- fread("Input/mean_stopping_times.csv")
 
 # fix station names that don't match
-railRep$org <- railRep$origin %>% tolower()
+railRep$org <- ifelse((railRep$interchange != "-" & railRep$direction=="DOWN"),
+                      railRep$interchange,railRep$origin) %>% tolower()
 railRep$org[railRep$org=="flemington"] <- "newmarket"
 railRep$org[railRep$org=="arts centre"] <- "flinders street"
 railRep$org[railRep$org=="federation square"] <- "flinders street"
 
-railRep$des <- railRep$destination %>% tolower()
+railRep$des <- ifelse((railRep$interchange != "-" & railRep$direction=="UP"),
+                      railRep$interchange,railRep$destination) %>% tolower()
 railRep$des[railRep$des=="flemington"] <- "newmarket"
 railRep$des[railRep$des=="arts centre"] <- "flinders street"
 railRep$des[railRep$des=="federation square"] <- "flinders street"
+
+railRep$OD.int <- ifelse(railRep$direction=="DOWN",
+                         paste0(railRep$origin,railRep$interchange),
+                         paste0(railRep$interchange,railRep$destination)) %>% tolower()
+
+#Calculate travel times for Buses going across train lines
 
 # create unique timetable and join with Rail Rep
 train.OD$OD <- paste0(train.OD$from,train.OD$to) %>% tolower()
@@ -255,8 +256,14 @@ railRep$OD <- paste0(railRep$org,railRep$des)
 
 railRep <- as.data.table(railRep) %>% setkey(OD)
 train.OD <- as.data.table(train.OD)[!duplicated(OD)] %>% setkey(OD)
-railRep <- railRep[train.OD[,.(OD,AvgTrainTime=time/60)]]
+railRep <- train.OD[,.(OD,AvgTrainTime=time/60)][railRep]
 
+setkey(railRep,OD.int)
+railRep <- train.OD[,.(OD,AvgTrainTimeInt=time/60)][railRep]
+railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
+
+railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
+railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
 
 #######################
 # Punctuality Metric (percent on time)
@@ -268,11 +275,9 @@ travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime))
+            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
 
-travel_times$Punctual <- ifelse(is.na(travel_times$TrainTime),
-                                ifelse(travel_times$TripTime <= (travel_times$XtraTime),1,0),
-                                ifelse(travel_times$TripTime <= (travel_times$TrainTime+travel_times$XtraTime),1,0))
+travel_times$Punctual <- ifelse((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$XtraTime),1,0)
 
 
 #CODE FOR JOURNEY TIMES TABLE
@@ -281,16 +286,15 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
             TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime), Date = as.Date(first(departure))) %>% 
+            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt),
+            Date = as.Date(first(departure))) %>% 
   group_by(type, peak, direction, Date) %>%
-  mutate(Punctual = ifelse(is.na(TrainTime),
-                           ifelse(TripTime <= (XtraTime),1,0),
-                           ifelse(TripTime <= (TrainTime+XtraTime),1,0))) %>%
+  mutate(Punctual = ifelse((TripTime+XtraTrain) <= (XtraTime),1,0)) %>%
   summarise(TravelTimes = mean(TripTime),
-            ExpectedTravelTime = mean(ifelse(is.na(TrainTime),TripTime-0,TripTime-TrainTime)), 
+            ExpectedTravelTime = mean((TripTime+XtraTrain)-TrainTime), 
             # ^this is actually delay, name is to avoid breaking references
             AdditionalTravelTime = mean(XtraTime),
-            Difference = mean(TripTime - ifelse(is.na(TrainTime),XtraTime,TrainTime+XtraTime)),
+            Difference = mean((TripTime+XtraTrain) - (TrainTime+XtraTime)),
             Punctuality = sum(Punctual),
             NumBuses = n()) %>% arrange(Date)
 
@@ -306,21 +310,3 @@ write.csv(filter(journey_times,
                  (peak=="AM Peak" | peak=="PM Peak"),
                  Date == Sys.Date()),
           paste0("Output/RRBJourneyTimes_",Sys.Date(),".csv"))
-
-#metrics to calculate:
-
-# Bus OD journey time : Average journey time. 
-# Suggest metric is daily average split by direction, time band 
-# (AM Peak, PM Peak, Non-Peak, Weekend, Public Holiday) and stopping pattern.
-
-# Additional journey time : Establish by time band and direction 
-# the average journey time through the affected area that a normal train/tram service 
-# would take and then measure the differential from actual bus journey time.
-
-# % Increased journey time : additional journey time / 'normal' journey time
-# represented as an average with the same aggregations as the OD journey times.
-
-# Bus sample size : # Valid trips / # Buses allocated 
-
-# % Services on-time : # Buses delivered with an OD Journey time < 4 minutes and 59 seconds 
-# more than expected / # Valid trips observed
