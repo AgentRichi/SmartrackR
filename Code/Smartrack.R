@@ -236,40 +236,27 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 #######################
 
 # load data
-train.OD <- fread("C:/Data/SUM/ServiceUSageModel_Train_May2017_People_Trip_OD_MAtrix_15Min.csv")
-transfers <- c("NULL","flinders street","parliament","southern cross","north melbourne","melbourne central","flagstaff")
-train.OD <- train.OD[transfer_point %in% transfers]
-# create unique timetable [O-D travel time x time of day (intervals)]
+train.OD <- fread("Input/mean_stopping_times.csv")
 
-timetable <- train.OD[,.(AvgTrainTime=mean(avg_trip_time)),
-                      by=.(day_type,org=origin,des=destination,origin_departure_hour)] %>% 
-  setkeyv(c("org","des","day_type","origin_departure_hour"))
-
-# compare bus leg times to TT & calculate additional travel time
-railRep$origin_departure_hour <- hour(railRep$departure)
-
-wkdays <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
-wkends <- c("Saturday","Sunday")
-
-railRep$day_type <- weekdays(railRep$departure)
-railRep$day_type[railRep$day_type %in% wkdays] <- "weekday"
-railRep$day_type[railRep$day_type %in% wkends] <- "weekend"
-
-railRep$org <- tolower(railRep$origin)
+# fix station names that don't match
+railRep$org <- railRep$origin %>% tolower()
 railRep$org[railRep$org=="flemington"] <- "newmarket"
 railRep$org[railRep$org=="arts centre"] <- "flinders street"
 railRep$org[railRep$org=="federation square"] <- "flinders street"
-railRep$des <- tolower(railRep$destination)
+
+railRep$des <- railRep$destination %>% tolower()
 railRep$des[railRep$des=="flemington"] <- "newmarket"
 railRep$des[railRep$des=="arts centre"] <- "flinders street"
 railRep$des[railRep$des=="federation square"] <- "flinders street"
 
-railRep <- railRep %>% as.data.table() %>% 
-  setkeyv(c("org","des","day_type","origin_departure_hour"))
-railRep <- timetable[railRep,roll = T, rollends = c(T, T)]
-railRep$AdditionalJourneyTime <- railRep$legTime - railRep$AvgTrainTime
-railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- railRep$legTime[is.na(railRep$AdditionalJourneyTime)]
-#railRep <- railRep %>% select(6:ncol(railRep))
+# create unique timetable and join with Rail Rep
+train.OD$OD <- paste0(train.OD$from,train.OD$to) %>% tolower()
+railRep$OD <- paste0(railRep$org,railRep$des)
+
+railRep <- as.data.table(railRep) %>% setkey(OD)
+train.OD <- as.data.table(train.OD)[!duplicated(OD)] %>% setkey(OD)
+railRep <- railRep[train.OD[,.(OD,AvgTrainTime=time/60)]]
+
 
 #######################
 # Punctuality Metric (percent on time)
