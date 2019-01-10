@@ -277,7 +277,7 @@ travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
             TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
 
-travel_times$Punctual <- ifelse((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$XtraTime),1,0)
+travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
 
 
 #CODE FOR JOURNEY TIMES TABLE
@@ -289,7 +289,7 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt),
             Date = as.Date(first(departure))) %>% 
   group_by(type, peak, direction, Date) %>%
-  mutate(Punctual = ifelse((TripTime+XtraTrain) <= (XtraTime),1,0)) %>%
+  mutate(Punctual = ifelse(((TripTime+XtraTrain) <= (TrainTime+XtraTime)),1,0)) %>%
   summarise(TravelTimes = mean(TripTime),
             ExpectedTravelTime = mean((TripTime+XtraTrain)-TrainTime), 
             # ^this is actually delay, name is to avoid breaking references
