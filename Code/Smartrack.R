@@ -91,7 +91,7 @@ buses$dwellTime <- dwellTime
 #calculate departure time (arrival+dwell) and get origin from preceding row
 buses <- buses %>% mutate(departure = lag(dwellTime,1)+lag(arrival,1),
                           origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
-  filter(origin != destination)
+  mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)
 buses$origin[1] <- "0"
 
 #assign ID
@@ -136,7 +136,7 @@ for(i in 1:nrow(routes)){
              between(as.numeric(format(arrival,"%H%M%S")),
                      as.numeric(format(route$start.time.filter,"%H%M%S")),
                      as.numeric(format(route$end.time.filter,"%H%M%S")))) %>%
-    filter(origin != destination)
+    filter(origin != destination,legTime < 120, legTime > 0) %>% arrange(Resource.Name,departure)
   
   #adjust peak periods
   peak.adjust <- minutes(route$peak.adjust)
@@ -150,9 +150,12 @@ for(i in 1:nrow(routes)){
   tripID <- 1
   org <- railRep$origin %>% trimws() %>% toupper()
   des <- railRep$destination %>% trimws() %>% toupper()
+  resource <- railRep$Resource.Name
+  resource
   N <- length(pattern)
   while(stops <= (nrow(railRep)-(N-2))) {
-    
+    #check that bus name is the same for all legs
+    if(length(unique(resource[stops:(stops+N-2)]))==1){
     #if bus is travelling in UP direction
     if((all.equal(org[stops:(stops+N-2)],pattern[1:(N-1)])==T) && 
        (all.equal(des[stops:(stops+N-2)],pattern[2:N])==T)) {
@@ -199,7 +202,8 @@ for(i in 1:nrow(routes)){
     
     #else not a replacement bus
     else(stops = stops+1)
-  }
+    } else(stops = stops+1)
+    }
   railRep <- railRep %>% filter(type != "0")
   buses.valid <- dt.append(buses.valid,railRep)
 }
@@ -211,9 +215,7 @@ for(i in 1:nrow(routes)){
 #remove non RRP Buses and unnecessary columns
 railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
-         direction,origin,destination,interchange,departure,arrival,dwellTime,onTime) %>%
-  mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2) %>%
-   filter(legTime < 120, legTime > 0) %>% arrange_('tripID','arrival')
+         direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime) %>% arrange_('tripID','arrival')
 
 
 # join station data for stop order when drawing arcchart
