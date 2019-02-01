@@ -63,8 +63,10 @@ routes <- read.xlsx("Input/BusRoutes.xlsx",
 
 routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")] <- force_tz(
   routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")],tz="UTC")
-
-buses <- buses %>% filter(Geofence.Name != "")
+buses_dup <- select(buses,Resource.Name,Registration,
+                       Enter.Odometer..km.,Distance.Travelled..km.,
+                       Geofence.Name) %>% duplicated(fromLast=T)
+buses <- buses %>% filter(Geofence.Name != "", !buses_dup)
 
 #Enter.Time is in a different format when loading csv compared to converting from xlsx
 # for csv direct download use as.POSIXct(strptime(gsub('[\\.]','',Enter.Time), format = '%d/%m/%Y %H:%M'))
@@ -91,7 +93,8 @@ buses$dwellTime <- dwellTime
 #calculate departure time (arrival+dwell) and get origin from preceding row
 buses <- buses %>% mutate(departure = lag(dwellTime,1)+lag(arrival,1),
                           origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
-  mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60),2)
+  mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60))
+
 buses$origin[1] <- "0"
 
 #assign ID
@@ -128,16 +131,31 @@ for(i in 1:nrow(routes)){
   
   #Filter dataset to dates and times
   railRep <- buses %>% filter(!(toupper(destination) %in% ignore)) %>% 
-    mutate(departure = lag(dwellTime,1)+lag(arrival,1),
-           origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
-    filter(origin != destination) %>%
+    # mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+    #        origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
     filter(departure >= route$start.datetime &
              arrival <= route$end.datetime &
              between(as.numeric(format(arrival,"%H%M%S")),
                      as.numeric(format(route$start.time.filter,"%H%M%S")),
                      as.numeric(format(route$end.time.filter,"%H%M%S")))) %>%
-    filter(origin != destination,legTime < 120, legTime > 0) %>% arrange(Resource.Name,departure)
+    mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+           origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+    mutate(legTime = difftime(arrival,departure, units = "mins")+(dwellTime/60)) %>%
+    arrange(Resource.Name,departure) 
+
+  #add while loop to remove trips with unrealistic leg times
+  # to_remove <- length(railRep$legTime[railRep$legTime>110 | railRep$legTime<0])
+  # while (to_remove > 0) {
+  #   railRep <- railRep %>% 
+  #     filter(legTime > 0, legTime < 110) %>% 
+  #     mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+  #            origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+  #     mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60)) %>%
+  #     arrange(Resource.Name,departure)
+  #   to_remove <- length(railRep$legTime[railRep$legTime>110 | railRep$legTime<0])
+  # }
   
+  railRep <- railRep %>% filter(origin != destination)
   #adjust peak periods
   peak.adjust <- minutes(route$peak.adjust)
   am.start.route <- (am.start + peak.adjust)
@@ -151,7 +169,6 @@ for(i in 1:nrow(routes)){
   org <- railRep$origin %>% trimws() %>% toupper()
   des <- railRep$destination %>% trimws() %>% toupper()
   resource <- railRep$Resource.Name
-  resource
   N <- length(pattern)
   while(stops <= (nrow(railRep)-(N-2))) {
     #check that bus name is the same for all legs
@@ -204,7 +221,8 @@ for(i in 1:nrow(routes)){
     else(stops = stops+1)
     } else(stops = stops+1)
     }
-  railRep <- railRep %>% filter(type != "0")
+  railRep <- railRep %>% filter(type != "0") %>% 
+    mutate(legTime = difftime(arrival,departure, tz = "AEST", units = "mins")+(dwellTime/60))
   buses.valid <- dt.append(buses.valid,railRep)
 }
 
@@ -215,9 +233,18 @@ for(i in 1:nrow(routes)){
 #remove non RRP Buses and unnecessary columns
 railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
-         direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime) %>% arrange_('tripID','arrival')
+         direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime) %>%
+  arrange_('tripID','arrival')
 
+# remove trips with unrealistic travel times
+to_remove <- railRep %>% filter((legTime < 0 | legTime > 110) 
+                                | (
+                                   (origin=='Arts Centre' | origin=='Moorabbin' | destination=='Arts Centre' | destination=='Moorabbin') & 
+                                     (legTime>60) & (arrival < as.Date("2019-01-31"))
+                                  )
+                                ) %>% select(tripID) %>% unique()
 
+railRep <- railRep %>% filter(!(tripID %in% to_remove$tripID))
 # join station data for stop order when drawing arcchart
 nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/stops.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
@@ -276,7 +303,7 @@ travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
-            TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
+            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
 
 travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
@@ -287,7 +314,7 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
-            TripTime = sum(legTime), TrainTime = sum(AvgTrainTime),
+            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt),
             Date = as.Date(first(departure))) %>% 
   group_by(type, peak, direction, Date) %>%
