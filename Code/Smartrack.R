@@ -294,20 +294,11 @@ railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
 railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
 
+#remove uneccessary tables
+remove(nodes, route, routes, to_remove, train.OD)
 #######################
 # Punctuality Metric (percent on time)
 #######################
-
-#CODE FOR TRAVEL TIMES TABLE
-travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
-  group_by(tripID, type, direction, peak, Resource.Name) %>%
-  summarise(Origin = first(origin), Destination = last(destination),
-            Departure = first(departure), Arrival = last(arrival),
-            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
-
-travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
-
 
 #CODE FOR JOURNEY TIMES TABLE
 journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
@@ -328,6 +319,16 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
             NumBuses = n()) %>% arrange(Date)
 
 journey_times$Punctuality <- round(journey_times$Punctuality / journey_times$NumBuses,2)
+
+#CODE FOR TRAVEL TIMES TABLE
+travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
+  group_by(tripID, type, direction, peak, Resource.Name) %>%
+  summarise(Origin = first(origin), Destination = last(destination),
+            Departure = first(departure), Arrival = last(arrival),
+            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
+            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
+
+travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
 
 #Refresh/create files with yesterdays and todays Peak travel information
 write.csv(filter(journey_times,
