@@ -56,7 +56,6 @@ routes <- read.xlsx("Input/BusRoutes.xlsx",
                     stringsAsFactors=FALSE,
                     as.data.frame = T) %>% na.omit()
 
-
 ###########################
 # STEP 2: Clean the data
 ###########################
@@ -191,6 +190,10 @@ for(i in 1:nrow(routes)){
         #remove dwelltime from final destination
         railRep$dwellTime[(stops+N-2)] <- 0
         
+        #Adjust start and end of trip by 2 minutes to account for time b/n entering Geofence and actually stopping
+        railRep$departure[stops] <- railRep$departure[stops] - minutes(2)
+        railRep$arrival[(stops+N-2)] <- railRep$arrival[(stops+N-2)] + minutes(2)
+        
         tripID <- tripID+1
         stops <- stops+(N-1)
       }
@@ -212,6 +215,10 @@ for(i in 1:nrow(routes)){
         railRep$interchange[stops] <- route$interchange
         #remove dwelltime from final destination
         railRep$dwellTime[(stops+N-2)] <- 0
+        
+        #Adjust start and end of trip by 2 minutes to account for time b/n entering Geofence and actually stopping
+        railRep$departure[stops] <- railRep$departure[stops] - minutes(2)
+        railRep$arrival[(stops+N-2)] <- railRep$arrival[(stops+N-2)] + minutes(2)
         
         tripID <- tripID+1
         stops <- stops+(N-1)
@@ -244,7 +251,16 @@ to_remove <- railRep %>% filter((legTime < 0 | legTime > 110)
                                 )
 ) %>% select(tripID) %>% unique()
 
+tt_remove <- railRep  %>% arrange_('tripID','arrival') %>%
+  group_by(tripID) %>%
+  summarise(TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins")) %>% 
+  filter(TripTime < 0 | TripTime > 180) %>% select(tripID)
+
+to_remove <- rbind(to_remove,tt_remove)
+
 railRep <- railRep %>% filter(!(tripID %in% to_remove$tripID))
+
+
 # join station data for stop order when drawing arcchart
 nodes <- read.csv("C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrack/Input/stops.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
@@ -294,39 +310,23 @@ railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
 railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
 
-#remove uneccessary tables
-remove(nodes, route, routes, to_remove, train.OD)
 #######################
 # Punctuality Metric (percent on time)
 #######################
-
-#CODE FOR TRAVEL TIMES TABLE
-travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
-  group_by(tripID, type, direction, peak, Resource.Name) %>%
-  summarise(Origin = first(origin), Destination = last(destination),
-            Departure = first(departure), Arrival = last(arrival),
-            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
-
-travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
-
-#filter travel times
-tt_remove <- travel_times %>% filter(TripTime < 0 | TripTime > 180) %>% select(tripID,type,direction,peak)
-railRep <- railRep %>% filter(!(tripID %in% tt_remove$tripID))
-travel_times <- travel_times %>% filter(!(tripID %in% tt_remove$tripID))
 
 #CODE FOR JOURNEY TIMES TABLE
 journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),
-            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), TrainTime = sum(AvgTrainTime),
+            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"),
+            TrainTime = sum(AvgTrainTime),
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt),
-            Date = as.Date(first(departure))) %>% 
+            Date = as.Date(first(departure))) %>%
   group_by(type, peak, direction, Date) %>%
   mutate(Punctual = ifelse(((TripTime+XtraTrain) <= (TrainTime+XtraTime)),1,0)) %>%
   summarise(TravelTimes = mean(TripTime),
-            ExpectedTravelTime = mean((TripTime+XtraTrain)-TrainTime), 
+            ExpectedTravelTime = mean((TripTime+XtraTrain)-TrainTime),
             # ^this is actually delay, name is to avoid breaking references
             AdditionalTravelTime = mean(XtraTime),
             Difference = mean((TripTime+XtraTrain) - (TrainTime+XtraTime)),
@@ -335,8 +335,20 @@ journey_times <- railRep  %>% arrange_('tripID','arrival') %>%
 
 journey_times$Punctuality <- round(journey_times$Punctuality / journey_times$NumBuses,2)
 
+#CODE FOR TRAVEL TIMES TABLE
+travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
+  group_by(tripID, type, direction, peak, Resource.Name) %>%
+  summarise(Origin = first(origin), Destination = last(destination),
+            Departure = first(departure), Arrival = last(arrival),
+            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"), 
+            TrainTime = sum(AvgTrainTime),XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
 
-#Refresh/create files with yesterdays and todays Peak travel information
+travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
+
+#remove uneccessary tables
+remove(nodes, route, routes, to_remove, tt_remove, train.OD, buses, buses.valid, tmp)
+
+# #Refresh/create files with yesterdays and todays Peak travel information
 write.csv(filter(journey_times,
                  (peak=="AM Peak" | peak=="PM Peak"),
                  Date == Sys.Date()-1),
