@@ -2,11 +2,34 @@
 # STEP 3: Assign Bus Routes
 ###########################
 
-#define peak periods
-am.start <- as.POSIXct("1899-12-30 7:00:00") %>% force_tz(tz="UCT")
-am.end <- as.POSIXct("1899-12-30 9:00:00 UTC") %>% force_tz(tz="UCT")
-pm.start <- as.POSIXct("1899-12-30 15:30:00 UTC") %>% force_tz(tz="UCT")
-pm.end <- as.POSIXct("1899-12-30 19:00:00 UTC") %>% force_tz(tz="UCT")
+#function to append rows during bus validation
+dt.append <- function(x1, x2) {
+  obj <- deparse(substitute(x1)) # get the actual object name as a string
+  assign(obj, value = data.table::rbindlist(list(x1, x2)), envir = .GlobalEnv)
+  
+}
+
+#Function to determine which peak period the route belongs to
+peak <- function(x,am.start,am.end,pm.start,pm.end) {
+  
+  x <- x %>% format("%H%M%S") %>% as.numeric()
+  am.start <- am.start %>% format("%H%M%S") %>% as.numeric()
+  am.end <- am.end %>% format("%H%M%S") %>% as.numeric()
+  pm.start <- pm.start %>% format("%H%M%S") %>% as.numeric()
+  pm.end <- pm.end %>% format("%H%M%S") %>% as.numeric()
+  
+  if(between(x,am.start,am.end)) "AM Peak"
+  else if(between(x,pm.start,pm.end)) "PM Peak"
+  else if(between(x,am.end,pm.start)) "Inter Peak"
+  else "Off Peak"
+  
+}
+
+  #define peak periods
+  am.start <- as.POSIXct("1899-12-30 7:00:00") %>% force_tz(tz="UCT")
+  am.end <- as.POSIXct("1899-12-30 9:00:00 UTC") %>% force_tz(tz="UCT")
+  pm.start <- as.POSIXct("1899-12-30 15:30:00 UTC") %>% force_tz(tz="UCT")
+  pm.end <- as.POSIXct("1899-12-30 19:00:00 UTC") %>% force_tz(tz="UCT")
 
 #compare bus stopping pattern to route and assign name
 #for loop variables
@@ -18,6 +41,8 @@ buses$onTime <- c(rep(0,nrow(buses)))
 buses$project <- c(rep(0,nrow(buses)))
 buses$interchange <- c(rep("-",nrow(buses)))
 
+routes <- routes %>% filter(start.datetime <= max(buses$departure,na.rm = T) , end.datetime >= min(buses$departure,na.rm = T))
+  
 buses.valid <- buses[0,]
 for(i in 1:nrow(routes)){
   

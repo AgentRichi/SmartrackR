@@ -74,3 +74,6 @@ railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
 railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
+
+#Prepare new data to save to folder
+splitData <- split.data.frame(railRep,paste(year(railRep$departure),month(railRep$departure),day(railRep$departure),sep = '-'))

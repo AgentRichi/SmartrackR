@@ -4,16 +4,16 @@
     "created" : 1554088691027.000,
     "dirty" : false,
     "encoding" : "UTF-8",
-    "folds" : "",
-    "hash" : "2166961500",
+    "folds" : "5|31|9|0|\n12|53|25|0|\n",
+    "hash" : "0",
     "id" : "EE4B5A08",
-    "lastKnownWriteTime" : 1554088442,
-    "last_content_update" : 1554088442,
+    "lastKnownWriteTime" : 1554096049,
+    "last_content_update" : 1554096049315,
     "path" : "C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Smartrak/Code/assignRoutes.R",
     "project_path" : "assignRoutes.R",
     "properties" : {
-        "cursorPosition" : "9,0",
-        "scrollLine" : "0"
+        "cursorPosition" : "157,1",
+        "scrollLine" : "125"
     },
     "relative_order" : 4,
     "source_on_save" : false,
