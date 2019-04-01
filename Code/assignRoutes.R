@@ -52,15 +52,27 @@ for(i in 1:nrow(routes)){
   pattern.rev <- unlist(strsplit(route$stops,",")) %>% trimws() %>% toupper() %>% rev()
   ignore <- unlist(strsplit(route$passes,",")) %>% trimws() %>% toupper()
   
+  #Check if start/end are on different days
+  if(difftime(route$start.time.filter,route$end.time.filter)<0) {
+    railRep <- buses %>% filter(!(toupper(destination) %in% ignore)) %>% 
+      # mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+      #        origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+      filter(departure >= route$start.datetime &
+               arrival <= route$end.datetime &
+               between(as.numeric(format(arrival,"%H%M%S")),
+                       as.numeric(format(route$start.time.filter,"%H%M%S")),
+                       as.numeric(format(route$end.time.filter,"%H%M%S"))))
+  } else {
+    railRep <- buses %>% filter(!(toupper(destination) %in% ignore)) %>% 
+      # mutate(departure = lag(dwellTime,1)+lag(arrival,1),
+      #        origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
+      filter(departure >= route$start.datetime &
+               arrival <= route$end.datetime &
+               (as.numeric(format(arrival,"%H%M%S")) > as.numeric(format(route$start.time.filter,"%H%M%S")) | 
+                  as.numeric(format(arrival,"%H%M%S")) < as.numeric(format(route$end.time.filter,"%H%M%S"))))
+  }
   #Filter dataset to dates and times
-  railRep <- buses %>% filter(!(toupper(destination) %in% ignore)) %>% 
-    # mutate(departure = lag(dwellTime,1)+lag(arrival,1),
-    #        origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
-    filter(departure >= route$start.datetime &
-             arrival <= route$end.datetime &
-             between(as.numeric(format(arrival,"%H%M%S")),
-                     as.numeric(format(route$start.time.filter,"%H%M%S")),
-                     as.numeric(format(route$end.time.filter,"%H%M%S")))) %>%
+  railRep <-  railRep %>%
     mutate(departure = lag(dwellTime,1)+lag(arrival,1),
            origin = ifelse(lag(Resource.Name,1)==Resource.Name,lag(destination,1),"0")) %>%
     mutate(legTime = difftime(arrival,departure, units = "mins")+(dwellTime/60)) %>%

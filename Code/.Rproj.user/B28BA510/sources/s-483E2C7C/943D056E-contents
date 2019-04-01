@@ -38,11 +38,7 @@ if(nrow(buses)!=0) {
   
   source('..\\Code\\calculateMetrics.R')
   
-  #remove uneccessary tables
-  remove(nodes, route, routes, to_remove, tt_remove, train.OD, buses.valid, tmp)
 }
-
-remove(buses)
 
 #######################
 # STEP 5: Load Tables
@@ -60,3 +56,7 @@ source('..\\Code\\travelTimes.R')
 # #Refresh/create files with yesterdays and todays Peak travel information
 source('..\\Code\\writeFile.R')
 } else {remove(railRep)}
+
+#remove uneccessary variables
+remove(list=setdiff(ls(),c("railRep","journey_times","travel_times")))
+gc()

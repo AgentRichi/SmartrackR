@@ -25,7 +25,6 @@ if(numFiles>0) {
                       sheetName = "BusRoutes", 
                       stringsAsFactors=FALSE,
                       as.data.frame = T) %>% na.omit()
-  
 }
 
 remove(numFiles)
