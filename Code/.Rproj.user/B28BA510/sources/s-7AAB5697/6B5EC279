@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1554076536225.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "6B5EC279",
+    "lastKnownWriteTime" : 1554076203,
+    "last_content_update" : 1554077406562,
+    "path" : "C:/Data/SmartrackR/Code/Smartrack.R",
+    "project_path" : "Smartrack.R",
+    "properties" : {
+        "cursorPosition" : "11,0",
+        "scrollLine" : "4"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

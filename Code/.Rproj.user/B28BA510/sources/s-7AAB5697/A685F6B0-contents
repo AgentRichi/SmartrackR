@@ -1,0 +1,3 @@
+work_dir <- "C:\\Users\\vicxjfn\\OneDrive - VicGov\\NIMP\\Smartrack"
+#work_dir <- "D:\\OneDrive - VicGov\\NIMP\\Smartrack"
+setwd(paste0(work_dir, ".\\Data\\"))

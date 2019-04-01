@@ -6,6 +6,10 @@ library(lubridate)
 library(xlsx)
 library(data.table)
 
+# Run next 2 lines only if using source() to run the script 
+# this.dir <- dirname(parent.frame(2)$ofile)
+# setwd(this.dir)
+
 #function to append rows during bus validation
 dt.append <- function(x1, x2) {
   obj <- deparse(substitute(x1)) # get the actual object name as a string
