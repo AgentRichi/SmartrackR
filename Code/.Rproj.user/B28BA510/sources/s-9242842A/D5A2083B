@@ -12,17 +12,17 @@
     "path" : null,
     "project_path" : null,
     "properties" : {
-        "cacheKey" : "1958D0A8",
+        "cacheKey" : "ECEE9E28",
         "caption" : "train.OD",
-        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=train.OD&cache_key=1958D0A8",
-        "displayedObservations" : "208",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=train.OD&cache_key=ECEE9E28",
+        "displayedObservations" : "222",
         "environment" : "",
         "object" : "train.OD",
         "preview" : "0",
-        "totalObservations" : "208",
-        "variables" : "3"
+        "totalObservations" : "222",
+        "variables" : "4"
     },
-    "relative_order" : 12,
+    "relative_order" : 7,
     "source_on_save" : false,
     "source_window" : "",
     "type" : "r_dataframe"

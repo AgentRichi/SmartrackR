@@ -52,7 +52,8 @@ if (nrow(railRep)>0) {
   
   #CODE FOR TRAVEL TIMES TABLE
   source('..\\Code\\travelTimes.R')
-
+}
+{
   #Refresh/create files with yesterdays and todays Peak travel information
   source('..\\Code\\writeFile.R')
 }
