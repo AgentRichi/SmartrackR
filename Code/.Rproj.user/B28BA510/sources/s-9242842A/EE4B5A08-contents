@@ -26,10 +26,10 @@ peak <- function(x,am.start,am.end,pm.start,pm.end) {
 }
 
   #define peak periods
-  am.start <- as.POSIXct("1899-12-30 7:00:00") %>% force_tz(tz="UCT")
-  am.end <- as.POSIXct("1899-12-30 9:00:00 UTC") %>% force_tz(tz="UCT")
-  pm.start <- as.POSIXct("1899-12-30 15:30:00 UTC") %>% force_tz(tz="UCT")
-  pm.end <- as.POSIXct("1899-12-30 19:00:00 UTC") %>% force_tz(tz="UCT")
+am.start <- as.POSIXct("1899-12-30 7:00:00") %>% force_tz(tz="UCT")
+am.end <- as.POSIXct("1899-12-30 9:00:00 UTC") %>% force_tz(tz="UCT")
+pm.start <- as.POSIXct("1899-12-30 15:30:00 UTC") %>% force_tz(tz="UCT")
+pm.end <- as.POSIXct("1899-12-30 19:00:00 UTC") %>% force_tz(tz="UCT")
 
 #compare bus stopping pattern to route and assign name
 #for loop variables

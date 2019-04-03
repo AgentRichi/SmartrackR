@@ -8,8 +8,8 @@ library(data.table)
 library(filesstrings)
 
 # # Run next 2 lines only if using source() to run the script
-# work_dir <- dirname(parent.frame(2)$ofile)
-# setwd(work_dir)
+work_dir <- dirname(parent.frame(2)$ofile)
+setwd(work_dir)
 setwd(getwd())
 
 ###########################
@@ -47,15 +47,15 @@ if(nrow(buses)!=0) {
 source('..\\Code\\railRep.R')
 
 if (nrow(railRep)>0) {
-#CODE FOR JOURNEY TIMES TABLE
-source('..\\Code\\journeyTimes.R')
+  #CODE FOR JOURNEY TIMES TABLE
+  source('..\\Code\\journeyTimes.R')
+  
+  #CODE FOR TRAVEL TIMES TABLE
+  source('..\\Code\\travelTimes.R')
 
-#CODE FOR TRAVEL TIMES TABLE
-source('..\\Code\\travelTimes.R')
-
-# #Refresh/create files with yesterdays and todays Peak travel information
-source('..\\Code\\writeFile.R')
-} else {remove(railRep)}
+  #Refresh/create files with yesterdays and todays Peak travel information
+  source('..\\Code\\writeFile.R')
+}
 
 #remove uneccessary variables
 remove(list=setdiff(ls(),c("railRep","journey_times","travel_times")))

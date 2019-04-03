@@ -30,8 +30,11 @@ railRep <- railRep %>% filter(!(tripID %in% to_remove$tripID))
 nodes <- read.csv("..\\Input\\stops.csv",stringsAsFactors = F)
 nodes <- cbind(sequence=1:nrow(nodes),nodes)[,1:2]
 
-railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>% 
-  left_join(nodes,by=(c('destination'='label'))) %>% rename(Seq.Org=sequence.x,Seq.Des=sequence.y)
+nodes$label <- tolower(nodes$label)
+railRep$org <- tolower(railRep$origin)
+railRep$des <- tolower(railRep$destination)
+railRep <- railRep %>% left_join(nodes,by=(c('org'='label'))) %>% 
+  left_join(nodes,by=(c('des'='label'))) %>% rename(Seq.Org=sequence.x,Seq.Des=sequence.y)
 
 
 #######################
@@ -39,7 +42,8 @@ railRep <- railRep %>% left_join(nodes,by=(c('origin'='label'))) %>%
 #######################
 
 # load data
-train.OD <- fread("..\\Input\\mean_stopping_times.csv")
+train.OD <- fread("..\\Input\\mean_stopping_times\\mean_stopping_times.csv") %>% 
+  select(from,time,to) %>% unique()
 
 # fix station names that don't match
 railRep$org <- ifelse((railRep$interchange != "-" & railRep$direction=="DOWN"),

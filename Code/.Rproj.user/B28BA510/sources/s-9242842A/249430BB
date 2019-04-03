@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1554247146524.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "249430BB",
+    "lastKnownWriteTime" : 3613424496345835862,
+    "last_content_update" : 1554247146524,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "F7E31ABC",
+        "caption" : "travel_times",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=travel_times&cache_key=F7E31ABC",
+        "displayedObservations" : 31159,
+        "environment" : "",
+        "object" : "travel_times",
+        "preview" : 0,
+        "totalObservations" : 31159,
+        "variables" : 14
+    },
+    "relative_order" : 12,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

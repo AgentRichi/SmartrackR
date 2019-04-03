@@ -21,7 +21,7 @@ arrival.1[is.na(arrival.1)] <- arrival.2[is.na(arrival.1)]
 arrival.1 <- force_tz(arrival.1,tz="UTC")
 
 buses <- buses %>% mutate(arrival = arrival.1,
-                          stop.order = as.numeric(unlist(lapply(strsplit(Geofence.Name," - "),'[[',3))),
+                          stop.order = unlist(lapply(strsplit(Geofence.Name," - "),'[[',3)),
                           destination = unlist(lapply(strsplit(Geofence.Name," - "),'[[',4))) %>%
   arrange(Resource.Name, arrival)
 
