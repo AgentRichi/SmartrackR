@@ -51,12 +51,14 @@ railRep$org <- ifelse((railRep$interchange != "-" & railRep$direction=="DOWN"),
 railRep$org[railRep$org=="flemington"] <- "newmarket"
 railRep$org[railRep$org=="arts centre"] <- "flinders street"
 railRep$org[railRep$org=="federation square"] <- "flinders street"
+railRep$org[railRep$org=="jolimont"] <- "jolimont-mcg"
 
 railRep$des <- ifelse((railRep$interchange != "-" & railRep$direction=="UP"),
                       railRep$interchange,railRep$destination) %>% tolower()
 railRep$des[railRep$des=="flemington"] <- "newmarket"
 railRep$des[railRep$des=="arts centre"] <- "flinders street"
 railRep$des[railRep$des=="federation square"] <- "flinders street"
+railRep$des[railRep$des=="jolimont"] <- "jolimont-mcg"
 
 railRep$OD.int <- ifelse(railRep$direction=="DOWN",
                          paste0(railRep$origin,railRep$interchange),
