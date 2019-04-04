@@ -46,10 +46,6 @@ if(nrow(buses)!=0) {
 #CODE FOR RRB TABLE
 source('..\\Code\\railRep.R')
 
-#remove uneccessary variables
-remove(list=setdiff(ls(),c("railRep")))
-gc()
-
 if (nrow(railRep)>0) {
   
   #CODE FOR TRAVEL TIMES TABLE
@@ -61,3 +57,7 @@ if (nrow(railRep)>0) {
   #Refresh/create files with yesterdays and todays Peak travel information
   source('..\\Code\\writeFile.R')
 }
+
+#remove uneccessary variables
+remove(list=setdiff(ls(),c("railRep")))
+gc()
