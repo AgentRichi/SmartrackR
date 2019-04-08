@@ -1,0 +1,34 @@
+######################################################################
+########### By Michael Simpson 15-01-2019 ############################
+######################################################################
+
+### Scheduling tweets to be pulled from the database at 9am every day
+### Generates csv file that we can send to MDI
+
+### The final files are saved onto OneDrive.
+### The R code files are saved on the H drive; as the full path is too long on OneDrive,
+### which is problematic for the task scheduler. A copy of this code is saved to OneDrive, however.
+
+
+
+
+### Script to schedule the "MDI Export SQL Query.R" script to run at 9am every day.
+
+
+#Package for scheduling tasks
+#install.packages("taskscheduleR")
+library(taskscheduleR)
+
+## Run every day at the same time on 09:00, starting from tomorrow on
+## Mark: change the format of startdate to your locale if needed (e.g. US: %m/%d/%Y)
+myscript <- "H:\\MDI_Tweet_Exports\\R_Scripts\\MDI_Export_Tweets_SQL_Query.R"
+
+taskscheduler_create(taskname = "Pulling-Tweets-for-MDI", rscript = myscript, 
+                     schedule = "DAILY", starttime = "07:00", startdate = format(Sys.Date()+1, "%d/%m/%Y"))
+
+## Test process - run once to check it is working
+# taskscheduler_create(taskname = "Pulling-Tweets-for-MDI", rscript = myscript, 
+#                      schedule = "ONCE", starttime = "11:11", startdate = format(Sys.Date(), "%d/%m/%Y"))
+
+### To delete:
+#taskscheduler_delete(taskname = "Pulling-Tweets-for-MDI")

@@ -1,0 +1,358 @@
+##############################################################
+###### Extracting Tweets from the Database ###################
+########## By Michael Simpson 15-01-2019 #####################
+##############################################################
+
+
+library(odbc)
+library(dbplyr)
+library(DBI)
+library(lubridate)
+library(dplyr)
+library(stringr)
+
+## Connect to the database
+
+con <- DBI::dbConnect(odbc::odbc(),
+                      Driver   = "SQL Server",
+                      Server   = "p04545.database.windows.net",
+                      Database = "twitterDB",
+                      #UID      = rstudioapi::askForPassword("Database User"),
+                      UID ="MDIGlobal",
+                      #PWD      = rstudioapi::askForPassword("Database Password"),
+                      PWD = "Tw1tterScr@per1234",
+                      Port     = 1433)
+
+## Have a look at the complete list of tables and their schemas
+rs <- dbSendQuery(con, "SELECT SCHEMA_NAME(schema_id) As SchemaName, name As TableName FROM sys.tables;")
+dbFetch(rs)
+
+## Build a vector of table names
+# tables <- dbListTables(con)
+# str(tables)
+
+
+### Check the distinct twitter accounts, and order by number of tweets - are there any accounts we should get rid of?
+# twitterAccounts <- dbGetQuery(con, "SELECT DISTINCT username, COUNT(tweetid)
+#                              FROM pbist_twitter.tweets_processed
+#                              WHERE dateorig >= '2018-12-01'
+#                              GROUP BY username
+#                              ORDER BY COUNT(tweetid) DESC")
+# write.csv(twitterAccounts, "C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\Twitter_Account_Listing_20190116.csv")
+
+
+## After checking the list, remove several twitter accounts - MTM, Yarra Trams etc, plus municipal authorities and bus companies
+## These accounts to exclude are contained in the SQL query below
+
+
+## Pull tweets from the database, while exculding the accounts identified as superflous
+
+MDI_Export <- dbGetQuery(con, "SELECT n.[masterid],
+                       n.[tweet],
+                       p.[dateorig],
+                       p.[username],
+                       p.[retweet],
+                       n.[lang],
+                       n.[sentiment],
+                       n.[sentimentbin]
+                       FROM [pbist_twitter].[tweets_normalized] n
+                       INNER JOIN [pbist_twitter].[tweets_processed] p
+                       ON n.[masterid] = p.[masterid]
+                       WHERE p.[dateorig] >= '2018-12-01' AND
+                              (p.[username] NOT IN ('metrotrains', 'VicTraffic', 'yarratrams', 'NotMetroNotify', 'ptv_official', 
+'NotPTVNotify', 'VicGovAu', 'CDCVictoria', 'levelcrossings', 'Transdev_Melb', 'WestGateTunnel', 'VenturaBus', 
+'cityofmelbourne', 'ChartersBus','YarraCouncil', 'cityofballarat', 'roadprojectsvic', 'metrotunnelvic', 'VicRoads', 
+'cityofportphillip', 'GreaterShepp', 'Full_on_fulton', 'stonestreetdsns')) AND
+                              p.[username] NOT LIKE '%council%' AND
+                              p.[username] NOT LIKE '%news%'
+                        ORDER BY dateorig DESC"
+)
+
+
+#Disconnect from the database once the data has been pulled
+dbDisconnect(con)
+
+### Now, let's clean it up abit.
+
+### Text strings to remove from the full data set, being irrelevant to the disruption period
+
+remove <- c("Their job is to organise", "rail delay scarf", "Iam furious with aca", "VFL star set to train with Carlton", "Tasmanian sheep farmer", "KITSCH is the child",
+            "Buses replace trains", "emergency road", "Highway", "Freeway", "water main",
+            "Werribee", "Sunbury", "Upfield", "Craigieburn", "Footscray", "Sunshine", "allow extra time",
+            "Moe residents in the gallery are rejoicing", "roads flooded", "Just a reminder", "Bolte", "fire",
+            "Heidelberg", "Hurstbridge", "Mernda", "hit by a train", "A family of DUCKS prompted", "Moray",
+            "Work starts on Mair Street today", "new photos", "fault", "Safety concerns", "Thompsons Road",
+            "bridge")
+
+
+### To avoid creating a pattern in text strings manually, we use "paste" with collapse"
+### grepl(paste(remove, collapse = "|"), MDI_Export$tweet)
+
+filtered <- filter(MDI_Export, grepl(paste(remove, collapse = "|"), MDI_Export$tweet) == 0)
+
+
+## Create flags for each line by scanning for station names
+## For future disruptions, you can the lines here.
+
+filtered$CranPak <- str_detect(filtered$tweet, paste(c("Cranbourne","Pakenham","Westall","Dandenong", "Caulfield"), collapse = "|")) 
+filtered$Frankston <- str_detect(filtered$tweet, paste(c("Frankston", "Caulfield"), collapse = "|"))
+filtered$Gippsland <- str_detect(filtered$tweet, paste(c("Gippsland", "Traralgon", "Warragul"), collapse = "|"))
+filtered$Ballarat <- str_detect(filtered$tweet, "Ballarat")
+filtered$YanYean <- str_detect(filtered$tweet, paste(c("Yan Yean", "YanYean"), collapse = "|"))
+filtered$Sandringham <- str_detect(filtered$tweet, paste(c("Sandringham", "Elsternwick"), collapse = "|"))
+
+# MDI_Export_Final <- bind_cols(filtered, CranPak, Frankston, Gippsland, Ballarat, YanYean, Sandringham)
+# names(MDI_Export_Final)[7:12] <- c("CranPak", "Frankston", "Gippsland", "Ballarat", "YanYean", "Sandringham")
+
+# Subtract 8 hours, using durations, to get the correct time that it was posted on Twitter
+filtered$dateorig <- filtered$dateorig - dhours(8)
+
+# Let's change the time zone
+force_tz(filtered$dateorig, "Australia/Melbourne")
+
+
+#Check
+glimpse(filtered)
+
+
+
+## Save to OneDrive, which is a shared folder
+write.csv(filtered, paste0("C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\Database 1 - Filtered\\","CleanedTweetsForMDI ", Sys.Date(), ".csv"))
+#write.xlsx(MDI_Export, paste0("C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\","TweetsForMDI ", Sys.Date(), ".xlsx"), row.names = "FALSE")
+# Writing to xlsx causes the time do be dispayed in the American m/d/y format...
+
+#######################################################################
+### Exporting the full tweet database, without any filters
+#########################################################################
+
+
+## Connect to the database
+con <- DBI::dbConnect(odbc::odbc(),
+                      Driver   = "SQL Server",
+                      Server   = "p04545.database.windows.net",
+                      Database = "twitterDB",
+                      #UID      = rstudioapi::askForPassword("Database User"),
+                      UID ="RRossmann",
+                      #PWD      = rstudioapi::askForPassword("Database Password"),
+                      PWD = "P@ssword1234",
+                      Port     = 1433)
+
+
+MDI_Export_Full <- dbGetQuery(con, "SELECT n.[masterid],
+                         n.[tweet],
+                         p.[dateorig],
+                         p.[username],
+                         p.[retweet],
+                         n.[lang],
+                         n.[sentiment],
+                         n.[sentimentbin]
+                         FROM [pbist_twitter].[tweets_normalized] n
+                         INNER JOIN [pbist_twitter].[tweets_processed] p
+                         ON n.[masterid] = p.[masterid]
+                         WHERE p.[dateorig] >= '2018-12-01'
+                              AND n.[lang] = 'en'")
+
+
+
+#Disconnect from the database once the data has been pulled
+dbDisconnect(con)
+
+
+## Create flags for each line by scanning for station names
+MDI_Export_Full$CranPak <- str_detect(MDI_Export_Full$tweet, paste(c("Cranbourne","Pakenham","Westall","Dandenong", "Caulfield"), collapse = "|"))
+MDI_Export_Full$Frankston <- str_detect(MDI_Export_Full$tweet, paste(c("Frankston", "Caulfield"), collapse = "|"))
+MDI_Export_Full$Gippsland <- str_detect(MDI_Export_Full$tweet, paste(c("Gippsland", "Traralgon", "Warragul"), collapse = "|"))
+MDI_Export_Full$Ballarat <- str_detect(MDI_Export_Full$tweet, "Ballarat")
+MDI_Export_Full$YanYean <- str_detect(MDI_Export_Full$tweet, paste(c("Yan Yean", "YanYean"), collapse = "|"))
+MDI_Export_Full$Sandringham <- str_detect(MDI_Export_Full$tweet, paste(c("Sandringham", "Elsternwick"), collapse = "|"))
+
+
+MDI_Export_Full$Craigieburn <- str_detect(MDI_Export_Full$tweet, paste(c("Craigieburn", "Broadmeadows", "Flemington Racecourse", "Newmarket", "Essendon"), collapse = "|"))
+MDI_Export_Full$Upfield <- str_detect(MDI_Export_Full$tweet, paste(c("Upfield", "Royal Park", "Brunswick", "Coburg"), collapse = "|"))
+MDI_Export_Full$Geelong <- str_detect(MDI_Export_Full$tweet, paste(c("Geelong", "Waurn Ponds", "Marshall", "Lara", "Tarneit", "Wyndham Vale"), collapse = "|"))
+MDI_Export_Full$Burnley <- str_detect(MDI_Export_Full$tweet, paste(c("Burnley", "Belgrave", "Lilydale", "Box Hill", "Ringwood", "Camberwell", "Alamein"), collapse = "|"))
+MDI_Export_Full$Bendigo <- str_detect(MDI_Export_Full$tweet, paste(c("Bendigo", "Swan Hill", "Echuca", "Clarkefield", "Kyneton", "Castlemaine"), collapse = "|"))
+MDI_Export_Full$Werribee <- str_detect(MDI_Export_Full$tweet, paste(c("Werribee"), collapse = "|"))
+MDI_Export_Full$Williamstown <- str_detect(MDI_Export_Full$tweet, paste(c("Williamstown"), collapse = "|"))
+MDI_Export_Full$Hurstbridge <- str_detect(MDI_Export_Full$tweet, paste(c("Hurstbridge", "Eltham", "Greensborough"), collapse = "|"))
+MDI_Export_Full$Mernda <- str_detect(MDI_Export_Full$tweet, paste(c("Mernda", "South Morang", "Reservoir", "Preston"), collapse = "|"))
+MDI_Export_Full$Sunbury <- str_detect(MDI_Export_Full$tweet, paste(c("Sunbury", "Watergardens"), collapse = "|"))
+
+
+#MDI_Export_Full <- bind_cols(MDI_Export_Full, Frankston, Gippsland, Ballarat, YanYean, Sandringham)
+#names(MDI_Export_Full)[10:14] <- c("Frankston", "Gippsland", "Ballarat", "YanYean", "Sandringham")
+
+# Subtract 8 hours, using durations, to get the correct time that it was posted on Twitter
+MDI_Export_Full$dateorig <- MDI_Export_Full$dateorig - dhours(8)
+
+# Let's change the time zone
+force_tz(MDI_Export_Full$dateorig, "Australia/Melbourne")
+
+
+
+officialChannels <- c("metrotrains", "VicTraffic", "yarratrams", "NotMetroNotify", "ptv_official", 
+"NotPTVNotify", "VicGovAu", "CDCVictoria", "levelcrossings", "Transdev_Melb", "WestGateTunnel", "VenturaBus", 
+"ChartersBus", "roadprojectsvic", "metrotunnelvic", "VicRoads", "vline_gippsland", "vline_seymour",
+"vline_bendigo", "vline_ballarat","vline_geelong", "VLine", "CPVBendigo", "ConnectEast", "VicGovtNews")
+
+municipalChannels <- c('cityofportphillip', 'GreaterShepp', 'YarraCouncil', 'cityofballarat', 'cityofmelbourne',
+                       'mooneevalleycc', 'MonashCouncil', 'BenallaRuralCty', 'CityofMaroondah', 
+                      'CHcouncilsVIC', 'TheHillsCouncil', 'BanyuleCouncil', 'Boroondara', 'MornPenShire', 
+                      'CityWhittlesea', 'MacedonRangesSC', 'MaribyrnongCC', 'morelandcouncil', 'HumeCityCouncil',
+                      'StonningtonNews', 'BanyuleCouncil', 'greaterdandy', 'FrankstonCity', 'CityOfCasey', 'CardiniaShire',
+                      'CityofDarebin', 'ManninghamCC')
+
+newsChannels <- c('ballaratcourier', 'theheraldsun', '7NewsMelbourne', 'NickMcCallum7', 'RadioKLFM', 'GPSCouncilNews', '9NewsMelb',
+                '3AW693', 'ToorakTimes', 'StarJournal_SE', 'GippslandTimes', 'BreakfastNews', 'PakenhamGazette', 
+                'theBaysideNews', 'AraratAddy', 'ABCRural', 'abcnews')
+
+# Create a flag for official channels
+MDI_Export_Full$OfficialChannel <- str_detect(MDI_Export_Full$username, paste(officialChannels, collapse = "|"))
+MDI_Export_Full$Municipalities <- str_detect(MDI_Export_Full$username, paste(municipalChannels, collapse = "|"))
+MDI_Export_Full$NewsOutlets <- str_detect(MDI_Export_Full$username, paste(newsChannels, collapse = "|"))
+
+MDI_Export_Full$ExportTime <- Sys.time()
+
+
+#Save it
+#write.csv(MDI_Export_Full, "Database1 - Full Export.csv")
+
+
+write.csv(MDI_Export_Full, paste0("C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\Database 1 - Full\\","Database 1 Full File ", Sys.Date(), ".csv"))
+
+
+
+#GettrafficVIC # good account for traffic upates
+
+####################################################################
+####################################################################
+
+
+##### DATABASE 2 #############
+
+
+
+
+con2 <- DBI::dbConnect(odbc::odbc(),
+                       Driver   = "SQL Server",
+                       Server   = "p04545.database.windows.net",
+                       Database = "twitterDB2",
+                       #UID      = rstudioapi::askForPassword("Database User"),
+                       UID ="RRossmann",
+                       #PWD      = rstudioapi::askForPassword("Database Password"),
+                       PWD = "P@ssword1234",
+                       Port     = 1433)
+
+MDI_Export2 <- dbGetQuery(con2, "SELECT n.[masterid],
+                          n.[tweet],
+                          p.[dateorig],
+                          p.[username],
+                          p.[retweet],
+                          n.[lang],                        
+                          n.[sentiment],
+                          n.[sentimentbin]
+                          FROM [pbist_twitter].[tweets_normalized] n
+                          INNER JOIN [pbist_twitter].[tweets_processed] p
+                          ON n.[masterid] = p.[tweetid]
+                          WHERE p.[dateorig] >= '2018-12-01' AND
+                          (p.[username] NOT IN ('metrotrains', 'VicTraffic', 'yarratrams', 'NotMetroNotify', 'ptv_official', 
+                          'NotPTVNotify', 'VicGovAu', 'CDCVictoria', 'levelcrossings', 'Transdev_Melb', 'WestGateTunnel', 'VenturaBus', 
+                          'cityofmelbourne', 'ChartersBus','YarraCouncil', 'cityofballarat', 'roadprojectsvic', 'metrotunnelvic', 'VicRoads', 
+                          'cityofportphillip', 'GreaterShepp', 'Full_on_fulton', 'stonestreetdsns', 'hienzdrive', 'Yarradrive',
+                          'idrivesafetyind')) AND
+                          p.[username] NOT LIKE '%council%' AND
+                          p.[username] NOT LIKE '%news%' AND
+                          p.[username] NOT LIKE '$vline_%'
+                          ORDER BY dateorig DESC"
+)
+
+
+
+MDI_Export2_Full <- dbGetQuery(con2, "SELECT n.[masterid],
+                               n.[tweet],
+                               p.[dateorig],
+                               p.[username],
+                               p.[retweet],
+                               n.[lang],                        
+                               n.[sentiment],
+                               n.[sentimentbin]
+                               FROM [pbist_twitter].[tweets_normalized] n
+                               INNER JOIN [pbist_twitter].[tweets_processed] p
+                               ON n.[masterid] = p.[tweetid]
+                               WHERE p.[dateorig] >= '2018-12-01'
+                               ORDER BY dateorig DESC"
+)
+
+
+#Disconnect from the database once the data has been pulled
+dbDisconnect(con2)
+
+### Text strings to remove from the full data set, being irrelevant to the disruption period
+
+remove <- c("will not run", "is delayed by", "Urdu", "election", "emergency", "MatthewGuyMP", "channel", "PTV Official",
+            "Ptv_Sports"," Ki ", "reduced capacity", "Heading out on New Year", "police", "Christmas", "flood",
+            "Geelong", "Seymour", "Shepparton", "Albury", "Hurstbridge", "Mernda", "Craigieburn", "Williamstown",
+            "Sunshine", "Footscray", "Sunbury", "Werribee")
+
+
+### To avoid creating a pattern in text strings manually, we use "paste" with collapse"
+### grepl(paste(remove, collapse = "|"), MDI_Export$tweet)
+
+filtered2 <- filter(MDI_Export2, grepl(paste(remove, collapse = "|"), MDI_Export2$tweet) == 0)
+
+
+
+## Create flags for each line by scanning for station names
+
+## Database 2: Filtered
+
+filtered2$CranPak <- str_detect(filtered2$tweet, paste(c("Cranbourne","Pakenham","Westall","Dandenong", "Caulfield", "Oakleigh"), collapse = "|"))
+filtered2$Frankston <- str_detect(filtered2$tweet, paste(c("Frankston", "Caulfield"), collapse = "|"))
+filtered2$Gippsland <- str_detect(filtered2$tweet, paste(c("Gippsland", "Traralgon", "Warragul"), collapse = "|"))
+filtered2$Ballarat <- str_detect(filtered2$tweet, "Ballarat")
+filtered2$YanYean <- str_detect(filtered2$tweet, paste(c("Yan Yean", "YanYean"), collapse = "|"))
+filtered2$Sandringham <- str_detect(filtered2$tweet, paste(c("Sandringham", "Elsternwick"), collapse = "|"))
+
+## Database 2" Full file
+
+
+MDI_Export2_Full$CranPak <- str_detect(MDI_Export2_Full$tweet, paste(c("Cranbourne","Pakenham","Westall","Dandenong", "Caulfield", "Oakleigh"), collapse = "|"))
+MDI_Export2_Full$Frankston <- str_detect(MDI_Export2_Full$tweet, paste(c("Frankston", "Caulfield"), collapse = "|"))
+MDI_Export2_Full$Gippsland <- str_detect(MDI_Export2_Full$tweet, paste(c("Gippsland", "Traralgon", "Warragul"), collapse = "|"))
+MDI_Export2_Full$Ballarat <- str_detect(MDI_Export2_Full$tweet, "Ballarat")
+MDI_Export2_Full$YanYean <- str_detect(MDI_Export2_Full$tweet, paste(c("Yan Yean", "YanYean"), collapse = "|"))
+MDI_Export2_Full$Sandringham <- str_detect(MDI_Export2_Full$tweet, paste(c("Sandringham", "Elsternwick"), collapse = "|"))
+
+
+MDI_Export2_Full$Craigieburn <- str_detect(MDI_Export2_Full$tweet, paste(c("Craigieburn", "Broadmeadows", "Flemington Racecourse", "Newmarket", "Essendon"), collapse = "|"))
+MDI_Export2_Full$Upfield <- str_detect(MDI_Export2_Full$tweet, paste(c("Upfield", "Royal Park", "Brunswick", "Coburg"), collapse = "|"))
+MDI_Export2_Full$Geelong <- str_detect(MDI_Export2_Full$tweet, paste(c("Geelong", "Waurn Ponds", "Marshall", "Lara", "Tarneit", "Wyndham Vale"), collapse = "|"))
+MDI_Export2_Full$Burnley <- str_detect(MDI_Export2_Full$tweet, paste(c("Burnley", "Belgrave", "Lilydale", "Box Hill", "Ringwood", "Camberwell", "Alamein"), collapse = "|"))
+MDI_Export2_Full$Bendigo <- str_detect(MDI_Export2_Full$tweet, paste(c("Bendigo", "Swan Hill", "Echuca", "Clarkefield", "Kyneton", "Castlemaine"), collapse = "|"))
+MDI_Export2_Full$Werribee <- str_detect(MDI_Export2_Full$tweet, paste(c("Werribee"), collapse = "|"))
+MDI_Export2_Full$Williamstown <- str_detect(MDI_Export2_Full$tweet, paste(c("Williamstown"), collapse = "|"))
+MDI_Export2_Full$Hurstbridge <- str_detect(MDI_Export2_Full$tweet, paste(c("Hurstbridge", "Eltham", "Greensborough"), collapse = "|"))
+MDI_Export2_Full$Mernda <- str_detect(MDI_Export2_Full$tweet, paste(c("Mernda", "South Morang", "Reservoir", "Preston"), collapse = "|"))
+MDI_Export2_Full$Sunbury <- str_detect(MDI_Export2_Full$tweet, paste(c("Sunbury", "Watergardens"), collapse = "|"))
+
+
+MDI_Export2_Full$OfficialChannel <- str_detect(MDI_Export2_Full$username, paste(officialChannels, collapse = "|"))
+MDI_Export2_Full$Municipalities <- str_detect(MDI_Export2_Full$username, paste(municipalChannels, collapse = "|"))
+MDI_Export2_Full$NewsOutlets <- str_detect(MDI_Export2_Full$username, paste(newsChannels, collapse = "|"))
+
+
+# Subtract 8 hours, using durations, to get the correct time that it was posted on Twitter
+filtered2$dateorig <- filtered2$dateorig - dhours(8)
+MDI_Export2_Full$dateorig <- MDI_Export2_Full$dateorig - dhours(8)
+
+# Let's change the time zone
+force_tz(filtered2$dateorig, "Australia/Melbourne")
+force_tz(MDI_Export2_Full$dateorig, "Australia/Melbourne")
+
+#Check
+glimpse(MDI_Export2_Full)
+
+## Save to OneDrive, which is a shared folder
+write.csv(MDI_Export2_Full, paste0("C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\Database 2 - Full\\","Database 2 Full File ", Sys.Date(), ".csv"))
+write.csv(filtered2, paste0("C:\\Users\\victibk\\OneDrive - VicGov\\Extracted Tweets for MDI\\Database 2 - Filtered\\","Database 2 Filtered ", Sys.Date(), ".csv"))
+
