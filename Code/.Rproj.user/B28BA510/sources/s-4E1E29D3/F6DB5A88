@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1554687555390.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "F6DB5A88",
+    "lastKnownWriteTime" : 1554651420,
+    "last_content_update" : 1554651420,
+    "path" : "C:/Users/vicxjfn/OneDrive - VicGov/NIMP/Social Media/Extracted Tweets for MDI/MDI_Export_Tweets_SQL_Query.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "11,16",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
