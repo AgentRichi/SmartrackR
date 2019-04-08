@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1554689140856.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "B32AB38A",
+    "lastKnownWriteTime" : 33214498230894660,
+    "last_content_update" : 1554689140856,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "74830C60",
+        "caption" : "journey_times",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=journey_times&cache_key=74830C60",
+        "displayedObservations" : "2116",
+        "environment" : "",
+        "object" : "journey_times",
+        "preview" : "0",
+        "totalObservations" : "2116",
+        "variables" : "10"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}
