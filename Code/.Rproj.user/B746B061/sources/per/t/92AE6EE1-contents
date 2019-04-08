@@ -11,6 +11,7 @@ library(lubridate)
 library(xlsx)
 library(data.table)
 library(filesstrings)
+library(arules)
 
 ###########################
 # STEP 1: Load the data
@@ -61,3 +62,7 @@ if (nrow(railRep)>0) {
   #Refresh/create files with yesterdays and todays Peak travel information
   source('..\\Code\\writeFile.R')
 }
+
+railRep <- as.data.frame(railRep)
+journey_times <- as.data.frame(journey_times)
+travel_times <- as.data.frame(travel_times)
