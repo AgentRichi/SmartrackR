@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1554701332265.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "C4410BD0",
+    "lastKnownWriteTime" : 1554701228,
+    "last_content_update" : 1554701228,
+    "path" : "D:/OneDrive - VicGov/NIMP/Smartrak/Code/writeFile.R",
+    "project_path" : "writeFile.R",
+    "properties" : {
+        "cursorPosition" : "22,16",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
