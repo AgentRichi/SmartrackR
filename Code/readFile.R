@@ -3,21 +3,33 @@
 ###########################
 
 #Load all data
-setwd("..\\Data\\")
 
-tfv_file <- list.files()
+tfv_file <- list.files("..\\Data\\")
+tfv_file2 <- list.files("..\\Dropbox\\Data\\")
 buses <- data.frame()
-numFiles <- length(tfv_file)
 
-if(numFiles>0) {
-  
-  for(i in 1:numFiles)
+if(length(tfv_file)>0) {
+  setwd("..\\Data\\")
+  for(i in 1:length(tfv_file))
   {
     buses <- rbind(buses,suppressWarnings(fread(tfv_file[i], 
                                                 select = c(1:7))))
   }
-  names(buses) <- gsub("[ ^[:blank:]:()+?&/\\-]", ".", names(buses))
+}
+
+if(length(tfv_file2)>0) {
+  setwd("..\\Dropbox\\Data\\")
+  for(i in 1:length(tfv_file2))
+  {
+    buses <- rbind(buses,suppressWarnings(fread(tfv_file2[i], 
+                                                select = c(1:7))))
+  }
+  setwd("..\\")
+}
+
+if (length(buses)>0) {
   
+  names(buses) <- gsub("[ ^[:blank:]:()+?&/\\-]", ".", names(buses))
   buses <- unique(buses)
   
   routes <- read.xlsx("..\\Input\\BusRoutes.xlsx",
