@@ -24,9 +24,10 @@ if(numFiles>0) {
   
   for(i in 1:numFiles)
   {
-    file.rename(tfv_file[i],paste0(Sys.Date(),"_",i,"_OneDrive.csv"))
-    if (file.exists(paste0(Sys.Date(),"_",i,"_OneDrive.csv"))) {
-      file.move(paste0(Sys.Date(),"_",i,"_OneDrive.csv"),"..\\Data_hist")
+    timenow <- Sys.time()
+    file.rename(tfv_file[i],paste0(timenow,"_",i,"_OneDrive.csv"))
+    if (file.exists(paste0(timenow,"_",i,"_OneDrive.csv"))) {
+      file.move(paste0(timenow,"_",i,"_OneDrive.csv"),"..\\Data_hist")
     }
   }
 }
@@ -40,9 +41,10 @@ if(numFiles>0) {
   
   for(i in 1:numFiles)
   {
-    file.rename(tfv_file[i],paste0(Sys.Date(),"_",i,"_DropBox.csv"))
-    if (file.exists(paste0(Sys.Date(),"_",i,"_DropBox.csv"))) {
-      file.move(paste0(Sys.Date(),"_",i,"_DropBox.csv"),"..\\..\\Data_hist")
+    timenow <- Sys.time()
+    file.rename(tfv_file[i],paste0(timenow,"_",i,"_DropBox.csv"))
+    if (file.exists(paste0(timenow,"_",i,"_DropBox.csv"))) {
+      file.move(paste0(timenow,"_",i,"_DropBox.csv"),"..\\..\\Data_hist")
     }
   }
 }
