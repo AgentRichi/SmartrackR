@@ -38,5 +38,13 @@ buses <- buses %>% mutate(departure = lag(dwellTime,1)+lag(arrival,1),
 
 buses$origin[1] <- "0"
 
+# Change des & org labels
+flagstaff = c('Peel Street','King Street')
+buses$origin[buses$origin %in% flagstaff] <- 'Flagstaff'
+buses$destination[buses$destination %in% flagstaff] <- 'Flagstaff'
+buses$origin[buses$origin == 'Racecourse'] <- 'Flemington'
+buses$destination[buses$destination == 'Racecourse'] <- 'Flemington'
+
+
 #assign ID
 buses <- cbind("ID" = sprintf("%07d", 1:nrow(buses)), buses)
