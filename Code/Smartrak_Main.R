@@ -46,9 +46,17 @@ if(nrow(buses)!=0) {
 #CODE FOR RRB TABLE
 source('..\\Code\\railRep.R')
 
+# to_remove <- lapply(strsplit(railRep$Resource.Name," "), '[[', 1) == "TDV" &
+#   railRep$departure < as.POSIXct('2019-10-01 20:00:00',tz = 'UTC') &
+#   railRep$departure > as.POSIXct('2019-09-28 00:00:00',tz = 'UTC')
+# 
+# railRep <- railRep[!to_remove,]
+
 #remove uneccessary variables
 remove(list=setdiff(ls(),c("railRep")))
 gc()
+
+
 
 if (nrow(railRep)>0) {
   
@@ -61,3 +69,4 @@ if (nrow(railRep)>0) {
   #Refresh/create files with yesterdays and todays Peak travel information
   source('..\\Code\\writeFile.R')
 }
+

@@ -46,5 +46,6 @@ buses$origin[buses$origin == 'Racecourse'] <- 'Flemington'
 buses$destination[buses$destination == 'Racecourse'] <- 'Flemington'
 
 
+#buses <- buses[(!(unlist(lapply(strsplit(buses$Resource.Name," "), '[[',1))=="TDV")|buses$arrival>as.POSIXct("2019-10-01 15:00:00")),]
 #assign ID
 buses <- cbind("ID" = sprintf("%07d", 1:nrow(buses)), buses)

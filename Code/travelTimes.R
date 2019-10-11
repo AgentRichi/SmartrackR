@@ -8,3 +8,12 @@ travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
             XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt))
 
 travel_times$Punctual <- ifelse(((travel_times$TripTime+travel_times$XtraTrain) <= (travel_times$TrainTime+travel_times$XtraTime)),1,0)
+
+to_remove <- lapply(strsplit(travel_times$Resource.Name," "), '[[', 1) == "TDV" & 
+  travel_times$TripTime > 60 & travel_times$Departure > as.POSIXct('2019-09-28 00:00:00',tz = 'UTC')
+remove_id <- travel_times$tripID[to_remove]
+
+railRep <- railRep %>% filter(!tripID %in% remove_id)
+travel_times <- travel_times %>% filter(!tripID %in% remove_id)
+
+remove('to_remove','remove_id')
