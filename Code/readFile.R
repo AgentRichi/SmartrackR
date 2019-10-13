@@ -59,7 +59,6 @@ if(length(tfv_file2)>0) {
     buses <- rbind(buses,suppressWarnings(fread(tfv_file2[i], 
                                                 select = c(1:7))))
   }
-}
   setwd("..\\")
 }
 
