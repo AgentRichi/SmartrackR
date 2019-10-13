@@ -11,6 +11,7 @@ library(lubridate)
 library(xlsx)
 library(data.table)
 library(filesstrings)
+library(zip)
 
 ###########################
 # STEP 1: Load the data
