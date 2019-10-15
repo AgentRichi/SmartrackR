@@ -13,7 +13,9 @@ to_remove <- lapply(strsplit(travel_times$Resource.Name," "), '[[', 1) == "TDV" 
   travel_times$TripTime > 60 & travel_times$Departure > as.POSIXct('2019-09-28 00:00:00',tz = 'UTC')
 remove_id <- travel_times$tripID[to_remove]
 
-railRep <- railRep %>% filter(!tripID %in% remove_id)
-travel_times <- travel_times %>% filter(!tripID %in% remove_id)
+manual_remove <- fread('..\\Input\\removeTrips.csv', sep = ',')
 
-remove('to_remove','remove_id')
+railRep <- railRep %>% filter(!tripID %in% remove_id) %>% filter(!tripID %in% manual_remove$tripID)
+travel_times <- travel_times %>% filter(!tripID %in% remove_id) %>% filter(!tripID %in% manual_remove$tripID)
+
+remove('to_remove','remove_id','manual_remove')

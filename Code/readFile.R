@@ -15,20 +15,25 @@ buses <- data.frame()
 
 if(length(tfv_file)>0) {
   setwd("..\\Data\\")
+  data_dir <- getwd()
   for(i in 1:length(tfv_file))
   {
+    #handle zipped files
     if (substrRight(tfv_file[i], 4) == ".zip"){
       tmp <- tempfile()
       unzip(tfv_file[i], exdir = tmp)
       file.remove(tfv_file[i])
       tmpfiles <- list.files(tmp)
+      setwd(tmp)
       for(j in 1:length(tmpfiles)){
-        file.rename(tmpfiles[i],paste0(tmpfiles[i],Sys.time()))
-        file.move(tmpfiles[i],getwd())
+        file.rename(tmpfiles[j],paste0(gsub("[ :-]","",Sys.time())," ",tmpfiles[j]))
+        newtmpfiles <- list.files(tmp)
+        file.move(newtmpfiles[1],data_dir)
       }
       Sys.sleep(1)
     }
   }
+  setwd(data_dir)
   tfv_file <- list.files()
   for(i in 1:length(tfv_file))
   {
@@ -39,20 +44,25 @@ if(length(tfv_file)>0) {
 
 if(length(tfv_file2)>0) {
   setwd("..\\Dropbox\\Data\\")
+  data_dir <- getwd()
   for(i in 1:length(tfv_file2))
   {
+    #handle zipped files
     if (substrRight(tfv_file2[i], 4) == ".zip"){
       tmp <- tempfile()
       unzip(tfv_file2[i], exdir = tmp)
       file.remove(tfv_file2[i])
       tmpfiles <- list.files(tmp)
+      setwd(tmp)
       for(j in 1:length(tmpfiles)){
-        file.rename(tmpfiles[i],paste0(tmpfiles[i],Sys.time()))
-        file.move(tmpfiles[i],getwd())
+        file.rename(tmpfiles[j],paste0(gsub("[ :-]","",Sys.time())," ",tmpfiles[j]))
+        newtmpfiles <- list.files(tmp)
+        file.move(newtmpfiles[1],data_dir)
       }
       Sys.sleep(1)
     }
   }
+  setwd(data_dir)
   tfv_file2 <- list.files()
   for(i in 1:length(tfv_file2))
   {
