@@ -77,8 +77,16 @@ if (length(buses)>0) {
   names(buses) <- gsub("[ ^[:blank:]:()+?&/\\-]", ".", names(buses))
   buses <- unique(buses)
   
-  routes <- read.xlsx("..\\Input\\BusRoutes.xlsx",
-                      sheetName = "BusRoutes", 
-                      stringsAsFactors=FALSE,
-                      as.data.frame = T) %>% na.omit()
+  cred = fromJSON(file = "..//dbCred.json")
+  
+  # loads the PostgreSQL driver
+  drv <- dbDriver("PostgreSQL")
+  # creates a connection to the postgres database
+  # note that "con" will be used later in each connection to the database
+  con <- dbConnect(drv, dbname = "NIMP",
+                   host = cred$host, port = cred$port,
+                   user = cred$user, password = cred$password)
+  rm(cred) # removes connection info
+  
+  routes <- dbGetQuery(con,'Select * from master.busroutes')
 }

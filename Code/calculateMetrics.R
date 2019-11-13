@@ -6,7 +6,7 @@
 railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
          direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime) %>%
-  arrange_('tripID','arrival')
+  arrange(tripID,arrival)
 
 # remove trips with unrealistic travel times
 to_remove <- railRep %>% filter((legTime < 0 | legTime > 110) 
@@ -16,7 +16,7 @@ to_remove <- railRep %>% filter((legTime < 0 | legTime > 110)
                                 )
 ) %>% select(tripID) %>% unique()
 
-tt_remove <- railRep  %>% arrange_('tripID','arrival') %>%
+tt_remove <- railRep  %>% arrange(tripID,arrival) %>%
   group_by(tripID) %>%
   summarise(TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins")) %>% 
   filter(TripTime < 0 | TripTime > 180) %>% select(tripID)

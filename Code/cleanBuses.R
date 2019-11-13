@@ -1,9 +1,10 @@
 ###########################
 # STEP 2: Clean the data
 ###########################
-  
-routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")] <- force_tz(
-  routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")],tz="UTC")
+
+# route table used to have start/end times, but these are now checked when buses are allocated to blitz periods instead
+# routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")] <- force_tz(
+#   routes[c("start.datetime","end.datetime","start.time.filter","end.time.filter")],tz="UTC")
 buses_dup <- select(buses,Resource.Name,Registration,
                     Enter.Odometer..km.,Distance.Travelled..km.,
                     Geofence.Name) %>% duplicated(fromLast=T)
