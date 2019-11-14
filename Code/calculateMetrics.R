@@ -25,6 +25,9 @@ to_remove <- rbind(to_remove,tt_remove)
 
 railRep <- railRep %>% filter(!(tripID %in% to_remove$tripID))
 
+####### 
+# DELETE ONCE VIZ IS IN TABLEAU, NO LONGER NEEDED
+
 
 # join station data for stop order when drawing arcchart
 nodes <- read.csv("..\\Input\\stops.csv",stringsAsFactors = F)
@@ -42,18 +45,22 @@ railRep <- railRep %>% left_join(nodes,by=(c('org'='label'))) %>%
 #######################
 
 # load data
+
+########
+# Rewrite to use "GTFS".odtimes table instead
+
 train.OD <- fread("..\\Input\\mean_stopping_times\\mean_stopping_times.csv") %>% 
   select(from,time,to) %>% unique()
 
 # fix station names that don't match
-railRep$org <- ifelse((railRep$interchange != "-" & railRep$direction=="DOWN"),
+railRep$org <- ifelse((railRep$interchange != "" & railRep$direction=="DOWN"),
                       railRep$interchange,railRep$origin) %>% tolower()
 railRep$org[railRep$org=="flemington"] <- "newmarket"
 railRep$org[railRep$org=="arts centre"] <- "flinders street"
 railRep$org[railRep$org=="federation square"] <- "flinders street"
 railRep$org[railRep$org=="jolimont"] <- "jolimont-mcg"
 
-railRep$des <- ifelse((railRep$interchange != "-" & railRep$direction=="UP"),
+railRep$des <- ifelse((railRep$interchange != "" & railRep$direction=="UP"),
                       railRep$interchange,railRep$destination) %>% tolower()
 railRep$des[railRep$des=="flemington"] <- "newmarket"
 railRep$des[railRep$des=="arts centre"] <- "flinders street"
@@ -81,5 +88,6 @@ railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
 railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
 
+#######
 #Prepare new data to save to folder
 splitData <- split.data.frame(railRep,paste(year(railRep$departure),month(railRep$departure),day(railRep$departure),sep = '-'))

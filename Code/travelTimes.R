@@ -1,5 +1,5 @@
 #CODE FOR TRAVEL TIMES TABLE
-travel_times <- railRep  %>% arrange_('tripID','arrival') %>%
+travel_times <- railRep  %>% arrange(tripID,arrival) %>%
   group_by(tripID, type, direction, peak, Resource.Name) %>%
   summarise(Origin = first(origin), Destination = last(destination),
             Departure = first(departure), Arrival = last(arrival),

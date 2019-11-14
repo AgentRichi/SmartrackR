@@ -87,6 +87,6 @@ if (length(buses)>0) {
                    host = cred$host, port = cred$port,
                    user = cred$user, password = cred$password)
   rm(cred) # removes connection info
-  
   routes <- dbGetQuery(con,'Select * from master.busroutes')
+  RPostgreSQL::dbDisconnect(con)
 }
