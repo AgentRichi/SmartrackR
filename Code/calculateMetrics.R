@@ -39,7 +39,8 @@ railRep$des <- tolower(railRep$destination)
 railRep <- railRep %>% left_join(nodes,by=(c('org'='label'))) %>% 
   left_join(nodes,by=(c('des'='label'))) %>% rename(Seq.Org=sequence.x,Seq.Des=sequence.y)
 
-
+railRep$Seq.Des[is.na(railRep$Seq.Des)] <- 0
+railRep$Seq.Org[is.na(railRep$Seq.Org)] <- 0
 #######################
 # Delay Metric (additional journey time)
 #######################
@@ -49,42 +50,167 @@ railRep <- railRep %>% left_join(nodes,by=(c('org'='label'))) %>%
 ########
 # Rewrite to use "GTFS".odtimes table instead
 
-train.OD <- fread("..\\Input\\mean_stopping_times\\mean_stopping_times.csv") %>% 
-  select(from,time,to) %>% unique()
+# train.od <- fread("..\\Input\\mean_stopping_times\\mean_stopping_times.csv") %>% 
+#   select(from,time,to) %>% unique()
 
+# loads the PostgreSQL driver and credentials
+drv <- dbDriver("PostgreSQL")
+cred = fromJSON(file = "..//dbCred.json")
+# creates a connection to the postgres database
+# note that "con" will be used later in each connection to the database
+con <- dbConnect(drv, dbname = "postgis_TAA",
+                 host = cred$host, port = cred$port,
+                 user = cred$user, password = cred$password)
+# dbWriteTable(con,"railRep",railRep,overwrite=TRUE)
+# dbWriteTable(con,"journey_times",journey_times,overwrite=TRUE)
+# dbWriteTable(con,"travel_times",travel_times,overwrite=TRUE)
+rm(cred) # removes connection info
+train.od <- dbGetQuery(con,'Select * from "GTFS".odtime')
+RPostgreSQL::dbDisconnect(con)
+
+## MOVE THESE TO EXTERNAL FILE
 # fix station names that don't match
-railRep$org <- ifelse((railRep$interchange != "" & railRep$direction=="DOWN"),
-                      railRep$interchange,railRep$origin) %>% tolower()
-railRep$org[railRep$org=="flemington"] <- "newmarket"
-railRep$org[railRep$org=="arts centre"] <- "flinders street"
-railRep$org[railRep$org=="federation square"] <- "flinders street"
-railRep$org[railRep$org=="jolimont"] <- "jolimont-mcg"
+# railRep$org <- ifelse((!(railRep$interchange %in% c("","-")) & railRep$direction=="DOWN"),
+#                       railRep$interchange,railRep$origin) %>% tolower()
+# railRep$org[railRep$org=="flemington"] <- "showgrounds"
+# railRep$org[railRep$org=="arts centre"] <- "flinders street"
+# railRep$org[railRep$org=="federation square"] <- "flinders street"
+# railRep$org[railRep$org=="jolimont"] <- "jolimont-mcg"
+# 
+# railRep$des <- ifelse((!(railRep$interchange %in% c("","-")) & railRep$direction=="UP"),
+#                       railRep$interchange,railRep$destination) %>% tolower()
+# railRep$des[railRep$des=="flemington"] <- "showgrounds"
+# railRep$des[railRep$des=="arts centre"] <- "flinders street"
+# railRep$des[railRep$des=="federation square"] <- "flinders street"
+# railRep$des[railRep$des=="jolimont"] <- "jolimont-mcg"
 
-railRep$des <- ifelse((railRep$interchange != "" & railRep$direction=="UP"),
-                      railRep$interchange,railRep$destination) %>% tolower()
-railRep$des[railRep$des=="flemington"] <- "newmarket"
-railRep$des[railRep$des=="arts centre"] <- "flinders street"
-railRep$des[railRep$des=="federation square"] <- "flinders street"
-railRep$des[railRep$des=="jolimont"] <- "jolimont-mcg"
+#manually overwrite incorrect names from conversion file
+name_conv <- read.csv('..//Input//name_conversions.csv')
+name_conv <- as.data.table(name_conv) %>% setkey(org)
+railRep <- as.data.table(railRep) %>% setkey(org)
+railRep <- name_conv[railRep]
 
-railRep$OD.int <- ifelse(railRep$direction=="DOWN",
+railRep$org <- apply(railRep, 1, function(x) {
+  if (is.na(x['match'])) {
+    return(x['org'])
+  } else {
+    #ifelse check is needed because 'fawkner' is both a tram and train stop
+    return(ifelse(x['type']=="UFD-FGS LTD EXP",x['org'],x['match']))
+  }
+})
+
+railRep <- railRep[,!"match"]
+names(name_conv) <- c("des","match")
+setkey(name_conv,des)
+setkey(railRep,des)
+railRep <- name_conv[railRep]
+
+railRep$des <- apply(railRep, 1, function(x) {
+  if (is.na(x['match'])) {
+    return(x['des'])
+  } else {
+    return(ifelse(x['type']=="UFD-FGS LTD EXP",x['des'],x['match']))
+  }
+})
+railRep <- railRep[,!"match"]
+
+# BBC-MBN is reversed in direction for some reason
+railRep$direction[railRep$od=="brighton beachmoorabbin"] <- "UP"
+railRep$direction[railRep$od=="moorabbinbrighton beach"] <- "DOWN"
+
+#create od keys
+railRep$od <- paste0(railRep$org,railRep$des)
+railRep$od.int <- ifelse(railRep$direction=="DOWN",
                          paste0(railRep$origin,railRep$interchange),
                          paste0(railRep$interchange,railRep$destination)) %>% tolower()
 
-#Calculate travel times for Buses going across train lines
+#remove suburb name and Railway Station from org and des lookup
+train.od$origin <- lapply(strsplit(train.od$origin,split = "[(]"), `[[`,1) %>% unlist() %>% tolower()
+train.od$origin[which(nchar(train.od$origin)>6)] <- 
+  lapply(strsplit(train.od$origin[which(nchar(train.od$origin)>6)],split = "railway"), `[[`,1) %>% 
+  unlist() %>% trimws()
+train.od$destination <- lapply(strsplit(train.od$destination,split = "[(]"), `[[`,1) %>% unlist() %>% tolower()
+train.od$destination[which(nchar(train.od$destination)>6)] <- 
+  lapply(strsplit(train.od$destination[which(nchar(train.od$destination)>6)],split = "railway"), `[[`,1) %>% 
+  unlist() %>% trimws()
 
-# create unique timetable and join with Rail Rep
-train.OD$OD <- paste0(train.OD$from,train.OD$to) %>% tolower()
-railRep$OD <- paste0(railRep$org,railRep$des)
+railRep <- as.data.table(railRep) %>% setkey(od)
+#get unique list of od combos
+rr.unique <- railRep[,.(org=ifelse(interchange %in% c("","-"),org,
+                                   tolower(ifelse(direction=="DOWN",
+                                                  interchange,org)
+                                           )
+                                   ),
+                        des=ifelse(interchange %in% c("","-"),des,
+                                   tolower(ifelse(direction=="DOWN",
+                                                  des,interchange)
+                                           )
+                                   ),od)] %>% unique() %>% setkey(od)
 
-railRep <- as.data.table(railRep) %>% setkey(OD)
-train.OD <- as.data.table(train.OD)[!duplicated(OD)] %>% setkey(OD)
-railRep <- train.OD[,.(OD,AvgTrainTime=time/60)][railRep]
+rr.unique$AvgTrainTime <- apply(rr.unique, 1, function(x) {
+  #match by origin/destination in both direction
+  org.match <- train.od[
+    (train.od$origin %in% x['org'] & train.od$destination %in% x['des'])|
+      (train.od$destination %in% x['org'] & train.od$origin %in% x['des']),
+  ]$time %>% mean(na.rm=TRUE)
+})
 
-setkey(railRep,OD.int)
-railRep <- train.OD[,.(OD,AvgTrainTimeInt=time/60)][railRep]
+rr.uniqueInt <- railRep[,.(org=tolower(ifelse(direction=="DOWN",origin,interchange)),
+                           des=tolower(ifelse(direction=="DOWN",interchange,destination)),od.int)] %>% unique() %>% setkey(od.int)
+
+rr.uniqueInt$AvgTrainTimeInt <- apply(rr.uniqueInt, 1, function(x) {
+  #match by origin/destination in both direction
+  org.match <- train.od[
+    (train.od$origin %in% x['org'] & train.od$destination %in% x['des'])|
+      (train.od$destination %in% x['org'] & train.od$origin %in% x['des']),
+  ]$time %>% mean(na.rm=TRUE)
+})
+
+# remove NAs and save in separate table
+railRep.fix <- railRep[is.na(AvgTrainTime)]
+railRep <- railRep[!tripID %in% railRep.fix$tripID]
+
+railRep.fix <- railRep.fix[,!"AvgTrainTime"]
+railRep.fix <- as.data.table(railRep.fix) %>% setkey(od)
+
+rr.unique.fix <- railRep.fix[,.(org=ifelse(interchange %in% c("","-"),org,
+                                       tolower(ifelse(direction=="DOWN",
+                                                      interchange,org)
+                                               )
+                                       ),
+                                des=ifelse(interchange %in% c("","-"),des,
+                                           tolower(ifelse(direction=="DOWN",
+                                                          des,interchange)
+                                                   )
+                                           ),od)] %>% unique() %>% setkey(od)
+
+# find average travel times using fuzzy matching
+# agrep is very slow on such a big lookup table...
+rr.unique.fix$AvgTrainTime <- apply(rr.unique.fix, 1, function(x) {
+  #match by origin
+  org.match <- train.od[agrep(x['org'],train.od$origin,ignore.case = TRUE),]
+  #filter to match destination as well
+  org.match <- org.match[agrep(x['des'],org.match$destination,ignore.case = TRUE),]
+  #going the opposite way
+  des.match <- train.od[agrep(x['des'],train.od$origin,ignore.case = TRUE),]
+  des.match <- des.match[agrep(x['org'],des.match$destination,ignore.case = TRUE),]
+
+  return(rbind(org.match,des.match)$time %>% mean(na.rm=TRUE))
+
+})
+
+#join results
+railRep <- rr.unique[,.(od,AvgTrainTime=AvgTrainTime/60)][railRep]
+setkey(railRep,od.int)
+railRep <- rr.uniqueInt[,.(od.int,AvgTrainTimeInt=AvgTrainTimeInt/60)][railRep]
 railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 
+railRep.fix <- rr.unique.fix[!is.na(rr.unique.fix$AvgTrainTime),.(od,AvgTrainTime=AvgTrainTime/60)][railRep.fix]
+setcolorder(railRep.fix,names(railRep))
+
+railRep <- rbind.data.frame(railRep,railRep.fix)
+
+#Calculate travel times for Buses going across train lines
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
 railRep$AdditionalJourneyTime[is.na(railRep$AdditionalJourneyTime)] <- 0
 

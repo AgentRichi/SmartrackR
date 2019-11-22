@@ -12,23 +12,35 @@ setwd("..\\Data_processed\\")
 # }
 # remove(tfv_file)
 
-# # loads the PostgreSQL driver and credentials
-# drv <- dbDriver("PostgreSQL")
-# cred = fromJSON(file = "..//dbCred.json")
-# # creates a connection to the postgres database
-# # note that "con" will be used later in each connection to the database
-# con <- dbConnect(drv, dbname = "NIMP",
-#                  host = cred$host, port = cred$port,
-#                  user = cred$user, password = cred$password)
-# 
-# if("railRep" %in% dbListTables(con)) {
-#   rr <- dbGetQuery(con,'Select * from master.railRep')
-#   railRep <- rbind(railRep,rr)
-#   railRep <- unique(railRep)
-# }
-# 
-# rm(cred) # removes connection info
-# RPostgreSQL::dbDisconnect(con)
+#make sure railRep is a data.table and cols are in the right order
+railRep <- as.data.table(railRep)
+railRep <- railRep[,.(od.int,AvgTrainTimeInt,od,AvgTrainTime,ID,Resource.Name,Registration,project,
+                      tripID,type,peak,direction,origin,destination,interchange,departure,arrival,
+                      legTime,dwellTime,onTime,org,des,Seq.Org,Seq.Des,AdditionalJourneyTime)]
+names(railRep) <- sub("[.]","_",names(railRep)) %>% tolower()
+railRep$id  <- as.character(railRep$id)
+
+# loads the PostgreSQL driver and credentials
+drv <- dbDriver("PostgreSQL")
+cred = fromJSON(file = "..//dbCred.json")
+# creates a connection to the postgres database
+# note that "con" will be used later in each connection to the database
+con <- dbConnect(drv, dbname = "NIMP",
+                 host = cred$host, port = cred$port,
+                 user = cred$user, password = cred$password)
+
+if("railrep" %in% dbListTables(con)) {
+  rr <- dbGetQuery(con,'Select * from master.railRep') %>% as.data.table()
+  setkey(rr.setdiff,tripid,org,des)
+  setkey(railRep,tripid,org,des)
+  railRep <- railRep[rr.setdiff]
+}
+
+rm(cred) # removes connection info
+RPostgreSQL::dbDisconnect(con)
+
+railRep$legtime <- as.numeric(railRep$legtime, unit = 'mins')
+railRep$additionaljourneytime <- as.numeric(railRep$additionaljourneytime, unit = 'mins')
 
 if(exists('splitData')) {
   #save new data into backup rds files

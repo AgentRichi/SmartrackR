@@ -14,6 +14,7 @@ library(data.table)
 library(filesstrings)
 library(zip)
 library(rjson)
+library(DBI)
 
 ###########################
 # STEP 1: Load the data
