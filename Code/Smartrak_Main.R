@@ -12,6 +12,7 @@ library(xlsx)
 library(data.table)
 library(filesstrings)
 library(zip)
+library(DBI)
 
 ###########################
 # STEP 1: Load the data
