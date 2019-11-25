@@ -1,19 +1,19 @@
 #CODE FOR JOURNEY TIMES TABLE
-journey_times <- railRep  %>% arrange(tripID,arrival) %>%
-  group_by(tripID, type, direction, peak, Resource.Name) %>%
-  summarise(Origin = first(origin), Destination = last(destination),
-            Departure = first(departure), Arrival = last(arrival),
-            TripTime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"),
-            TrainTime = sum(AvgTrainTime),
-            XtraTime = first(onTime), XtraTrain = sum(AvgTrainTimeInt),
-            Date = as.Date(first(departure))) %>%
-  group_by(type, peak, direction, Date) %>%
-  mutate(Punctual = ifelse(((TripTime+XtraTrain) <= (TrainTime+XtraTime)),1,0)) %>%
-  summarise(TravelTimes = mean(TripTime),
-            Delay = mean((TripTime+XtraTrain)-TrainTime),
-            AdditionalTravelTime = mean(XtraTime),
-            Difference = mean((TripTime+XtraTrain) - (TrainTime+XtraTime)),
-            Punctuality = sum(Punctual),
-            NumBuses = n()) %>% arrange(Date)
+journey_times <- railRep  %>% arrange(tripid,arrival) %>%
+  group_by(tripid, type, direction, peak, resource_name) %>%
+  summarise(origin = first(origin), destination = last(destination),
+            departure = first(departure), arrival = last(arrival),
+            triptime = difftime(last(arrival),first(departure), tz = "AEST", units = "mins"),
+            traintime = sum(avgtraintime),
+            expected_delay = first(ontime), traintimeint = sum(avgtraintimeint),
+            travdate = as.Date(first(departure))) %>%
+  group_by(type, peak, direction, travdate) %>%
+  mutate(punctual = ifelse(((triptime+traintimeint) <= (traintime+expected_delay)),1,0)) %>%
+  summarise(traveltimes = mean(triptime),
+            delay = mean((triptime+traintimeint)-traintime),
+            additionaltraveltime = mean(delay),
+            difference = mean((triptime+traintimeint) - (traintime+expected_delay)),
+            punctuality = sum(punctual),
+            numbuses = n()) %>% arrange(travdate)
 
-journey_times$Punctuality <- round(journey_times$Punctuality / journey_times$NumBuses,2)
+journey_times$punctuality <- round(journey_times$punctuality / journey_times$numbuses,2)

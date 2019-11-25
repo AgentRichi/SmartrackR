@@ -20,6 +20,9 @@ railRep <- railRep[,.(od.int,AvgTrainTimeInt,od,AvgTrainTime,ID,Resource.Name,Re
 names(railRep) <- sub("[.]","_",names(railRep)) %>% tolower()
 railRep$id  <- as.character(railRep$id)
 
+railRep$legtime <- as.numeric(railRep$legtime, unit = 'mins')
+railRep$additionaljourneytime <- as.numeric(railRep$additionaljourneytime, unit = 'mins')
+
 # loads the PostgreSQL driver and credentials
 drv <- dbDriver("PostgreSQL")
 cred = fromJSON(file = "..//dbCred.json")
@@ -30,17 +33,17 @@ con <- dbConnect(drv, dbname = "NIMP",
                  user = cred$user, password = cred$password)
 
 if("railrep" %in% dbListTables(con)) {
-  rr <- dbGetQuery(con,'Select * from master.railRep') %>% as.data.table()
-  setkey(rr.setdiff,tripid,org,des)
+  rr <- dbGetQuery(con,'Select * from master.railRep') %>% as.data.table() %>% unique()
+  setkey(rr,tripid,org,des)
   setkey(railRep,tripid,org,des)
-  railRep <- railRep[rr.setdiff]
+  railRep.setdiff <- railRep[!tripid %in% rr$tripid]
+  # make sure new values are not duplicated
+  rr <- rr[!railRep]
+  railRep <- rbind(railRep,rr)
 }
 
 rm(cred) # removes connection info
 RPostgreSQL::dbDisconnect(con)
-
-railRep$legtime <- as.numeric(railRep$legtime, unit = 'mins')
-railRep$additionaljourneytime <- as.numeric(railRep$additionaljourneytime, unit = 'mins')
 
 if(exists('splitData')) {
   #save new data into backup rds files

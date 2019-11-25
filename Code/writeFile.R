@@ -9,11 +9,6 @@
 #                  Date == Sys.Date()),
 #           paste0("..\\Output\\RRBJourneyTimes_",Sys.Date(),".csv"))
 
-#Save tables as flat files for powerBI
-# fwrite(railRep.fix %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\railRep.fix.csv",dateTimeAs = "ISO")
-# fwrite(travel_times %>% mutate(Departure=as.character(Departure),Arrival=as.character(Arrival)),"..\\PowerBI_flat_files\\travel_times.csv")
-# fwrite(journey_times %>% mutate(Date=as.character(Date)),"..\\PowerBI_flat_files\\journey_times.csv")
-
 # loads the PostgreSQL driver and credentials
 drv <- dbDriver("PostgreSQL")
 cred = fromJSON(file = "..//dbCred.json")
@@ -72,7 +67,7 @@ dbDisconnect(con)
 # railRep$destination <- railRep$destination %>% sapply(FUN = function(x) gsub(pattern = "/",replacement = " ",x=x))
 
 
-railRep.split <- split.data.frame(railRep,railRep$type)
+railRep.split <- split.data.frame(railRep.setdiff,railRep.setdiff$type)
 
 # n <- 300
 # nr <- nrow(df)
@@ -168,3 +163,8 @@ if(numFiles>0) {
 }
 
 setwd("..\\")
+
+#Save tables as flat files for powerBI
+fwrite(railRep %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\railRep.csv",dateTimeAs = "ISO")
+fwrite(travel_times %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\travel_times.csv")
+fwrite(journey_times %>% mutate(travdate=as.character(travdate)),"..\\PowerBI_flat_files\\journey_times.csv")

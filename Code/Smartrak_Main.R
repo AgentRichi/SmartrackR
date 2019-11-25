@@ -51,7 +51,7 @@ if(nrow(buses)!=0) {
 source('..\\Code\\railRep.R')
 
 #remove uneccessary variables
-remove(list=setdiff(ls(),c("railRep")))
+remove(list=setdiff(ls(),c("railRep","railRep.setdiff")))
 gc()
 
 

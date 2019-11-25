@@ -166,49 +166,52 @@ rr.uniqueInt$AvgTrainTimeInt <- apply(rr.uniqueInt, 1, function(x) {
   ]$time %>% mean(na.rm=TRUE)
 })
 
-# remove NAs and save in separate table
-railRep.fix <- railRep[is.na(AvgTrainTime)]
-railRep <- railRep[!tripID %in% railRep.fix$tripID]
-
-railRep.fix <- railRep.fix[,!"AvgTrainTime"]
-railRep.fix <- as.data.table(railRep.fix) %>% setkey(od)
-
-rr.unique.fix <- railRep.fix[,.(org=ifelse(interchange %in% c("","-"),org,
-                                       tolower(ifelse(direction=="DOWN",
-                                                      interchange,org)
-                                               )
-                                       ),
-                                des=ifelse(interchange %in% c("","-"),des,
-                                           tolower(ifelse(direction=="DOWN",
-                                                          des,interchange)
-                                                   )
-                                           ),od)] %>% unique() %>% setkey(od)
-
-# find average travel times using fuzzy matching
-# agrep is very slow on such a big lookup table...
-rr.unique.fix$AvgTrainTime <- apply(rr.unique.fix, 1, function(x) {
-  #match by origin
-  org.match <- train.od[agrep(x['org'],train.od$origin,ignore.case = TRUE),]
-  #filter to match destination as well
-  org.match <- org.match[agrep(x['des'],org.match$destination,ignore.case = TRUE),]
-  #going the opposite way
-  des.match <- train.od[agrep(x['des'],train.od$origin,ignore.case = TRUE),]
-  des.match <- des.match[agrep(x['org'],des.match$destination,ignore.case = TRUE),]
-
-  return(rbind(org.match,des.match)$time %>% mean(na.rm=TRUE))
-
-})
-
 #join results
 railRep <- rr.unique[,.(od,AvgTrainTime=AvgTrainTime/60)][railRep]
 setkey(railRep,od.int)
 railRep <- rr.uniqueInt[,.(od.int,AvgTrainTimeInt=AvgTrainTimeInt/60)][railRep]
 railRep$AvgTrainTimeInt[is.na(railRep$AvgTrainTimeInt)]  <- 0
 
-railRep.fix <- rr.unique.fix[!is.na(rr.unique.fix$AvgTrainTime),.(od,AvgTrainTime=AvgTrainTime/60)][railRep.fix]
-setcolorder(railRep.fix,names(railRep))
+# remove NAs and save in separate table
+railRep.fix <- railRep[is.na(AvgTrainTime)]
 
-railRep <- rbind.data.frame(railRep,railRep.fix)
+if (nrow(railRep.fix) > 0 ){
+  railRep <- railRep[!tripID %in% railRep.fix$tripID]
+  
+  railRep.fix <- railRep.fix[,!"AvgTrainTime"]
+  railRep.fix <- as.data.table(railRep.fix) %>% setkey(od)
+  
+  rr.unique.fix <- railRep.fix[,.(org=ifelse(interchange %in% c("","-"),org,
+                                             tolower(ifelse(direction=="DOWN",
+                                                            interchange,org)
+                                             )
+  ),
+  des=ifelse(interchange %in% c("","-"),des,
+             tolower(ifelse(direction=="DOWN",
+                            des,interchange)
+             )
+  ),od)] %>% unique() %>% setkey(od)
+  
+  # find average travel times using fuzzy matching
+  # agrep is very slow on such a big lookup table...
+  rr.unique.fix$AvgTrainTime <- apply(rr.unique.fix, 1, function(x) {
+    #match by origin
+    org.match <- train.od[agrep(x['org'],train.od$origin,ignore.case = TRUE),]
+    #filter to match destination as well
+    org.match <- org.match[agrep(x['des'],org.match$destination,ignore.case = TRUE),]
+    #going the opposite way
+    des.match <- train.od[agrep(x['des'],train.od$origin,ignore.case = TRUE),]
+    des.match <- des.match[agrep(x['org'],des.match$destination,ignore.case = TRUE),]
+    
+    return(rbind(org.match,des.match)$time %>% mean(na.rm=TRUE))
+    
+  })
+  
+  railRep.fix <- rr.unique.fix[!is.na(rr.unique.fix$AvgTrainTime),.(od,AvgTrainTime=AvgTrainTime/60)][railRep.fix]
+  setcolorder(railRep.fix,names(railRep))
+  
+  railRep <- rbind.data.frame(railRep,railRep.fix)
+}
 
 #Calculate travel times for Buses going across train lines
 railRep$AdditionalJourneyTime <- railRep$legTime + railRep$AvgTrainTimeInt - railRep$AvgTrainTime
