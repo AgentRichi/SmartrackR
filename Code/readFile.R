@@ -80,7 +80,7 @@ if (length(buses)>0) {
   cred = fromJSON(file = "..//dbCred.json")
   
   # loads the PostgreSQL driver
-  drv <- dbDriver("PostgreSQL")
+  drv <- DBI::dbDriver("PostgreSQL")
   # creates a connection to the postgres database
   # note that "con" will be used later in each connection to the database
   con <- dbConnect(drv, dbname = "NIMP",

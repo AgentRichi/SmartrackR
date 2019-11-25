@@ -13,6 +13,8 @@ library(data.table)
 library(filesstrings)
 library(zip)
 library(DBI)
+library(RPostgreSQL)
+library(rjson)
 
 ###########################
 # STEP 1: Load the data
