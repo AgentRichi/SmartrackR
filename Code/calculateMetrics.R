@@ -5,7 +5,7 @@
 #remove non RRP Buses and unnecessary columns
 railRep <- buses.valid %>% 
   select(ID,Resource.Name,Registration,project,tripID,type,peak,
-         direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime) %>%
+         direction,origin,destination,interchange,departure,arrival,legTime,dwellTime,onTime,path_order) %>%
   arrange(tripID,arrival)
 
 # remove trips with unrealistic travel times
@@ -27,7 +27,7 @@ railRep <- railRep %>% filter(!(tripID %in% to_remove$tripID))
 
 ####### 
 # DELETE ONCE VIZ IS IN TABLEAU, NO LONGER NEEDED
-
+# could maybe use path_order for this purpose instead?
 
 # join station data for stop order when drawing arcchart
 nodes <- read.csv("..\\Input\\stops.csv",stringsAsFactors = F)
@@ -68,22 +68,6 @@ rm(cred) # removes connection info
 train.od <- dbGetQuery(con,'Select * from "GTFS".odtime')
 RPostgreSQL::dbDisconnect(con)
 
-## MOVE THESE TO EXTERNAL FILE
-# fix station names that don't match
-# railRep$org <- ifelse((!(railRep$interchange %in% c("","-")) & railRep$direction=="DOWN"),
-#                       railRep$interchange,railRep$origin) %>% tolower()
-# railRep$org[railRep$org=="flemington"] <- "showgrounds"
-# railRep$org[railRep$org=="arts centre"] <- "flinders street"
-# railRep$org[railRep$org=="federation square"] <- "flinders street"
-# railRep$org[railRep$org=="jolimont"] <- "jolimont-mcg"
-# 
-# railRep$des <- ifelse((!(railRep$interchange %in% c("","-")) & railRep$direction=="UP"),
-#                       railRep$interchange,railRep$destination) %>% tolower()
-# railRep$des[railRep$des=="flemington"] <- "showgrounds"
-# railRep$des[railRep$des=="arts centre"] <- "flinders street"
-# railRep$des[railRep$des=="federation square"] <- "flinders street"
-# railRep$des[railRep$des=="jolimont"] <- "jolimont-mcg"
-
 #manually overwrite incorrect names from conversion file
 name_conv <- read.csv('..//Input//name_conversions.csv')
 name_conv <- as.data.table(name_conv) %>% setkey(org)
@@ -114,9 +98,9 @@ railRep$des <- apply(railRep, 1, function(x) {
 })
 railRep <- railRep[,!"match"]
 
-# BBC-MBN is reversed in direction for some reason
-railRep$direction[railRep$od=="brighton beachmoorabbin"] <- "UP"
-railRep$direction[railRep$od=="moorabbinbrighton beach"] <- "DOWN"
+# # BBC-MBN is reversed in direction for some reason
+# railRep$direction[railRep$od=="brighton beachmoorabbin"] <- "UP"
+# railRep$direction[railRep$od=="moorabbinbrighton beach"] <- "DOWN"
 
 #create od keys
 railRep$od <- paste0(railRep$org,railRep$des)

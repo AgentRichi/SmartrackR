@@ -32,7 +32,7 @@ if(!"railrep" %in% dbListTables(con)) {
                            rr.colnames[6]," varchar, ",
                            rr.colnames[7]," varchar, ",
                            rr.colnames[8]," varchar, ",
-                           rr.colnames[9]," varchar, ",
+                           rr.colnames[9]," varchar NOT NULL, ",
                            rr.colnames[10]," varchar, ",
                            rr.colnames[11]," varchar, ",
                            rr.colnames[12]," varchar, ",
@@ -49,7 +49,9 @@ if(!"railrep" %in% dbListTables(con)) {
                            rr.colnames[23]," integer, ",
                            rr.colnames[24]," integer, ",
                            rr.colnames[25]," numeric, ",
-                           "CONSTRAINT unique_rr_id UNIQUE (tripID));"
+                           rr.colnames[26]," varchar NOT NULL, ",
+                           "PRIMARY KEY (tripid,path_order),",
+                           " CONSTRAINT unique_rr_id UNIQUE (tripid,path_order));"
                            )
   dbBegin(con)
   dbSendQuery(con,rr.create_query)
@@ -114,7 +116,10 @@ sapply(railRep.split, function(rr.split) {
                           "'",df_row[22],"'",", ",
                           df_row[23],", ",
                           df_row[24],", ",
-                          df_row[25],");")
+                          df_row[25],", ",
+                          "'",df_row[26],"'",
+                          ") ON CONFLICT ON CONSTRAINT unique_rr_id DO NOTHING",
+                          ";")
     DBI::dbBegin(con)
     DBI::dbSendQuery(con,"SET client_encoding = WIN1252;")
     DBI::dbCommit(con)
@@ -139,10 +144,10 @@ if(numFiles>0) {
   
   for(i in 1:numFiles)
   {
-    timenow <- Sys.time()
-    file.rename(tfv_file[i],paste0(timenow,"_",i,"_OneDrive.csv"))
-    tfv_file <- list.files()
-    file.move(tfv_file[1],"..\\Data_hist")
+    timenow <- gsub("[ :-]","",Sys.time())
+    file_name <- paste0(gsub(".csv","",tfv_file[i]),timenow,"_",i,"_OneDrive.csv")
+    file.rename(tfv_file[i],file_name)
+    file.move(file_name,"..\\Data_hist")
   }
 }
 
@@ -155,10 +160,10 @@ if(numFiles>0) {
   
   for(i in 1:numFiles)
   {
-    timenow <- Sys.time()
-    file.rename(tfv_file[i],paste0(timenow,"_",i,"_DropBox.csv"))
-    tfv_file <- list.files()
-    file.move(tfv_file[1],"..\\Data_hist")
+    timenow <- gsub("[ :-]","",Sys.time())
+    file_name <- paste0(gsub(".csv","",tfv_file[i]),timenow,"_",i,"DropBox.csv")
+    file.rename(tfv_file[i],file_name)
+    file.move(file_name,"..\\Data_hist")
   }
 }
 

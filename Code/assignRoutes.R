@@ -40,6 +40,7 @@ buses$peak <- c(rep(0,nrow(buses)))
 buses$onTime <- c(rep(0,nrow(buses)))
 buses$project <- c(rep(0,nrow(buses)))
 buses$interchange <- c(rep("-",nrow(buses)))
+buses$path_order <- c(rep(0,nrow(buses)))
   
 ##
 # ADD FILTER: buses to validate > time of last bus in database
@@ -97,6 +98,7 @@ for(i in 1:nrow(routes)){
                                                 am.start.route,am.end.route,
                                                 pm.start.route,pm.end.route)
         railRep$project[stops:(stops+N-2)] <- route$project
+        railRep$path_order[stops:(stops+N-2)] <- 1:(N-1)
         railRep$interchange[(stops+N-2)] <- route$interchange
         #remove dwelltime from final destination
         railRep$dwellTime[(stops+N-2)] <- 0
@@ -123,6 +125,7 @@ for(i in 1:nrow(routes)){
                                                 am.start.route,am.end.route,
                                                 pm.start.route,pm.end.route)
         railRep$project[stops:(stops+N-2)] <- route$project
+        railRep$path_order[stops:(stops+N-2)] <- (N-1):1
         railRep$interchange[stops] <- route$interchange
         #remove dwelltime from final destination
         railRep$dwellTime[(stops+N-2)] <- 0

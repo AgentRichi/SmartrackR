@@ -16,7 +16,7 @@ setwd("..\\Data_processed\\")
 railRep <- as.data.table(railRep)
 railRep <- railRep[,.(od.int,AvgTrainTimeInt,od,AvgTrainTime,ID,Resource.Name,Registration,project,
                       tripID,type,peak,direction,origin,destination,interchange,departure,arrival,
-                      legTime,dwellTime,onTime,org,des,Seq.Org,Seq.Des,AdditionalJourneyTime)]
+                      legTime,dwellTime,onTime,org,des,Seq.Org,Seq.Des,AdditionalJourneyTime,path_order)]
 names(railRep) <- sub("[.]","_",names(railRep)) %>% tolower()
 railRep$id  <- as.character(railRep$id)
 
@@ -32,6 +32,7 @@ con <- dbConnect(drv, dbname = "NIMP",
                  host = cred$host, port = cred$port,
                  user = cred$user, password = cred$password)
 
+#special case where railrep table exists but is empty will cause an error
 if("railrep" %in% dbListTables(con)) {
   rr <- dbGetQuery(con,'Select * from master.railRep') %>% as.data.table() %>% unique()
   setkey(rr,tripid,org,des)
@@ -40,7 +41,7 @@ if("railrep" %in% dbListTables(con)) {
   # make sure new values are not duplicated
   rr <- rr[!railRep]
   railRep <- rbind(railRep,rr)
-}
+} else {railRep.setdiff <- railRep}
 
 rm(cred) # removes connection info
 RPostgreSQL::dbDisconnect(con)
