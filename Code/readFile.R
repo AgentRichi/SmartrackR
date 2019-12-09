@@ -89,6 +89,5 @@ if (length(buses)>0) {
   rm(cred) # removes connection info
   routes <- dbGetQuery(con,'Select * from master.busroutes')
   RPostgreSQL::dbDisconnect(con)
+  routes$interchange <- ifelse(routes$interchange=="","-",routes$interchange)
 }
-
-routes$interchange <- ifelse(routes$interchange=="","-",routes$interchange)

@@ -171,5 +171,5 @@ setwd("..\\")
 
 #Save tables as flat files for powerBI
 fwrite(railRep %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\railRep.csv",dateTimeAs = "ISO")
-fwrite(travel_times %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\travel_times.csv")
+fwrite(travel_times %>% mutate(departure=as.character(departure),arrival=as.character(arrival)),"..\\PowerBI_flat_files\\travel_times.csv",dateTimeAs = "ISO")
 fwrite(journey_times %>% mutate(travdate=as.character(travdate)),"..\\PowerBI_flat_files\\journey_times.csv")
