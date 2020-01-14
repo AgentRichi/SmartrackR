@@ -91,3 +91,5 @@ if (length(buses)>0) {
   RPostgreSQL::dbDisconnect(con)
   routes$interchange <- ifelse(routes$interchange=="","-",routes$interchange)
 }
+
+names(buses)[1] <- "Resource.Name"
