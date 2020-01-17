@@ -23,6 +23,9 @@ if (exists('railRep')) {
   railRep$legtime <- as.numeric(railRep$legtime, unit = 'mins')
   railRep$additionaljourneytime <- as.numeric(railRep$additionaljourneytime, unit = 'mins')
   
+  #manually add cran-city express times
+  railRep[railRep$od=='cranbournem420 express',4] <- 45
+  railRep[railRep$od=='m420 expressparliament',4] <- 45
   # loads the PostgreSQL driver and credentials
   drv <- dbDriver("PostgreSQL")
   cred = fromJSON(file = "..//dbCred.json")
