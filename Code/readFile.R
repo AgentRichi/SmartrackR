@@ -37,8 +37,10 @@ if(length(tfv_file)>0) {
   tfv_file <- list.files()
   for(i in 1:length(tfv_file))
   {
-    buses <- rbind(buses,suppressWarnings(fread(tfv_file[i], 
-                                                select = c(1:7))))
+    new_file <- suppressWarnings(fread(tfv_file[i], 
+                                       select = c(1:7)))
+    names(new_file)[1] <- "Resource Name"
+    buses <- rbind(buses,new_file)
   }
 }
 
