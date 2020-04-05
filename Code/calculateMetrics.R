@@ -70,8 +70,9 @@ RPostgreSQL::dbDisconnect(con)
 
 #manually overwrite incorrect names from conversion file
 name_conv <- read.csv('..//Input//name_conversions.csv')
-name_conv <- as.data.table(name_conv) %>% setkey(org)
-railRep <- as.data.table(railRep) %>% setkey(org)
+railRep$route_match <- ifelse(railRep$type %in% unique(name_conv$route),railRep$type,'all')
+name_conv <- as.data.table(name_conv) %>% setkeyv(c('route','org'))
+railRep <- as.data.table(railRep) %>% setkeyv(c('route_match','org'))
 railRep <- name_conv[railRep]
 
 railRep$org <- apply(railRep, 1, function(x) {
@@ -84,9 +85,9 @@ railRep$org <- apply(railRep, 1, function(x) {
 })
 
 railRep <- railRep[,!"match"]
-names(name_conv) <- c("des","match")
-setkey(name_conv,des)
-setkey(railRep,des)
+names(name_conv) <- c("route","des","match")
+setkeyv(name_conv,c('route','des'))
+setkeyv(railRep,c('route','des'))
 railRep <- name_conv[railRep]
 
 railRep$des <- apply(railRep, 1, function(x) {

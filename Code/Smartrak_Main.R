@@ -55,7 +55,6 @@ remove(list=setdiff(ls(),c("railRep","railRep.setdiff")))
 gc()
 
 
-
 if (nrow(railRep)>0) {
   
   #CODE FOR TRAVEL TIMES TABLE
